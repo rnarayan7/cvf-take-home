@@ -1,1 +1,1 @@
-# Tests package
+"""Init file for src pytest"""

@@ -17,6 +17,7 @@ engine = create_engine(
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 # Dependency to get database session
 def get_db():
     db = SessionLocal()
@@ -25,7 +26,9 @@ def get_db():
     finally:
         db.close()
 
+
 # Create tables
 def create_tables():
-    from models import Base
+    from src.python.models.models import Base
+
     Base.metadata.create_all(bind=engine)
