@@ -14,21 +14,6 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# Check if we're in the right directory
-if [ ! -f "requirements.txt" ]; then
-    echo "❌ Please run this script from the src/ directory"
-    echo "   cd src && ./run.sh"
-    exit 1
-fi
-
-# Install dependencies if needed
-if [ ! -d "venv" ] && [ ! -f ".requirements_installed" ]; then
-    echo "📦 Installing dependencies..."
-    uv pip install -r requirements.txt
-    touch .requirements_installed
-    echo "✅ Dependencies installed"
-fi
-
 # Run the Python script with all arguments passed through
 echo "🚀 Starting CVF API..."
 PYTHONPATH=. python3 src/python/cli.py "$@"
