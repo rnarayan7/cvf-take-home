@@ -24,11 +24,11 @@ fi
 # Install dependencies if needed
 if [ ! -d "venv" ] && [ ! -f ".requirements_installed" ]; then
     echo "📦 Installing dependencies..."
-    pip install -r requirements.txt
+    uv pip install -r requirements.txt
     touch .requirements_installed
     echo "✅ Dependencies installed"
 fi
 
 # Run the Python script with all arguments passed through
 echo "🚀 Starting CVF API..."
-python3 run.py "$@"
+PYTHONPATH=. python3 src/python/cli.py "$@"
