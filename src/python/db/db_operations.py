@@ -11,7 +11,7 @@ import pandas as pd
 import structlog
 from fastapi import Depends
 
-from src.python.models.models import Company, Cohort, Payment, Threshold, RecalcJob
+from src.python.db.schemas import Company, Cohort, Payment, Threshold
 from src.python.db.database import get_db
 
 logger = structlog.get_logger(__file__)
@@ -45,10 +45,10 @@ class CompanyOperations:
         logger.debug("Fetching company by name", name=name)
         return self.db.query(Company).filter(Company.name == name).first()
 
-    def list_companies(self, skip: int = 0, limit: int = 100) -> List[Company]:
-        """List all companies with pagination"""
-        logger.debug("Listing companies", skip=skip, limit=limit)
-        return self.db.query(Company).offset(skip).limit(limit).all()
+    def list_companies(self) -> List[Company]:
+        """List all companies"""
+        logger.debug("Listing companies")
+        return self.db.query(Company).all()
 
     def company_exists(self, company_id: int) -> bool:
         """Check if company exists"""
@@ -286,55 +286,6 @@ class AnalyticsOperations:
         return data
 
 
-class RecalcJobOperations:
-    """Database operations for recalculation jobs"""
-
-    def __init__(self, db: Session):
-        self.db = db
-
-    def create_recalc_job(self, company_id: int, trigger: str) -> RecalcJob:
-        """Create a new recalculation job"""
-        logger.info("Creating recalc job", company_id=company_id, trigger=trigger)
-
-        job = RecalcJob(company_id=company_id, trigger=trigger, status="running")
-        self.db.add(job)
-        self.db.commit()
-        self.db.refresh(job)
-
-        logger.info("Recalc job created", job_id=job.id)
-        return job
-
-    def update_job_status(
-        self, job_id: int, status: str, log: Optional[str] = None, error_message: Optional[str] = None
-    ) -> None:
-        """Update job status and completion info"""
-        logger.info("Updating job status", job_id=job_id, status=status)
-
-        job = self.db.query(RecalcJob).filter(RecalcJob.id == job_id).first()
-        if job:
-            job.status = status
-            if log:
-                job.log = log
-            if error_message:
-                job.error_message = error_message
-            if status in ["completed", "failed"]:
-                from datetime import datetime
-
-                job.finished_at = datetime.utcnow()
-
-            self.db.commit()
-            logger.info("Job status updated", job_id=job_id, status=status)
-
-    def list_jobs_by_company(self, company_id: int, limit: int = 50) -> List[RecalcJob]:
-        """List recent jobs for a company"""
-        logger.debug("Listing jobs", company_id=company_id, limit=limit)
-        return (
-            self.db.query(RecalcJob)
-            .filter(RecalcJob.company_id == company_id)
-            .order_by(RecalcJob.started_at.desc())
-            .limit(limit)
-            .all()
-        )
 
 
 # Session-aware database operations class
@@ -348,7 +299,6 @@ class DatabaseOperations:
         self.payments = PaymentOperations(db)
         self.thresholds = ThresholdOperations(db)
         self.analytics = AnalyticsOperations(db)
-        self.jobs = RecalcJobOperations(db)
 
 
 # Factory function for dependency injection

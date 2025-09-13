@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
+from src.python.db.schemas import Base
 
 load_dotenv()
 
@@ -29,6 +30,4 @@ def get_db():
 
 # Create tables
 def create_tables():
-    from src.python.models.models import Base
-
     Base.metadata.create_all(bind=engine)

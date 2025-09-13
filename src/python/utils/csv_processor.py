@@ -9,7 +9,7 @@ import structlog
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from src.python.models.models import Payment
+from src.python.db.schemas import Payment
 
 logger = structlog.get_logger(__file__)
 

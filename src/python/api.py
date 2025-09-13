@@ -6,7 +6,7 @@ from datetime import date, datetime
 import structlog
 
 from src.python.utils.calc import payment_df_to_cohort_df, get_cvf_cashflows_df
-from src.python.models.models import (
+from python.models.models import (
     CompanyCreate,
     CompanyResponse,
     CohortCreate,
@@ -23,33 +23,8 @@ logger = structlog.get_logger(__file__)
 
 app = FastAPI(
     title="CVF Portfolio Management API",
-    description="""
-    ## CVF Portfolio Management API
-    
-    This API manages cohort-based payments and cashflows for customer value funds.
-    
-    ### Features:
-    * **Companies**: Manage portfolio companies
-    * **Cohorts**: Track sales & marketing spend plans by month
-    * **Payments**: Upload and manage customer payment data
-    * **Analytics**: Calculate metrics like MOIC, LTV, CAC
-    * **Cashflows**: View projected cashflows with trading terms
-    * **Thresholds**: Set minimum payment thresholds
-    
-    ### Getting Started:
-    1. Create a company using `POST /companies/`
-    2. Add cohorts (spend plans) using `POST /companies/{id}/cohorts/`
-    3. Upload payment data using `POST /companies/{id}/payments/upload`
-    4. View analytics at `GET /companies/{id}/metrics`
-    """,
+    description="API for managing cohort-based payments and cashflows",
     version="1.0.0",
-    contact={
-        "name": "CVF API Support",
-        "email": "support@cvf.com",
-    },
-    license_info={
-        "name": "MIT",
-    },
 )
 
 # CORS middleware
@@ -78,7 +53,7 @@ async def health_check():
 
 
 # Company endpoints
-@app.post("/companies/", response_model=CompanyResponse, tags=["Companies"])
+@app.post("/companies/", response_model=CompanyResponse)
 async def create_company(company: CompanyCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """Create a new company"""
     logger.info("Creating company", name=company.name)
@@ -90,22 +65,20 @@ async def create_company(company: CompanyCreate, db_ops: DatabaseOperations = De
         raise HTTPException(status_code=400, detail="Company with this name already exists")
 
     try:
-        db_company = db_ops.companies.create_company(company.name)
-        return CompanyResponse.from_db(db_company)
+        return db_ops.companies.create_company(company.name)
     except Exception as e:
         logger.error("Failed to create company", name=company.name, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to create company")
 
 
-@app.get("/companies/", response_model=List[CompanyResponse], tags=["Companies"])
-async def list_companies(db_ops: DatabaseOperations = Depends(get_db_operations)):
-    """List all companies"""
-    logger.info("Listing companies")
-    db_companies = db_ops.companies.list_companies()
-    return [CompanyResponse.from_db(company) for company in db_companies]
+@app.get("/companies/", response_model=List[CompanyResponse])
+async def list_companies(skip: int = 0, limit: int = 100, db_ops: DatabaseOperations = Depends(get_db_operations)):
+    """List all companies with pagination"""
+    logger.info("Listing companies", skip=skip, limit=limit)
+    return db_ops.companies.list_companies(skip, limit)
 
 
-@app.get("/companies/{company_id}", response_model=CompanyResponse, tags=["Companies"])
+@app.get("/companies/{company_id}", response_model=CompanyResponse)
 async def get_company(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """Get company by ID"""
     logger.info("Getting company", company_id=company_id)
@@ -113,11 +86,11 @@ async def get_company(company_id: int, db_ops: DatabaseOperations = Depends(get_
     if not company:
         logger.warning("Company not found", company_id=company_id)
         raise HTTPException(status_code=404, detail="Company not found")
-    return CompanyResponse.from_db(company)
+    return company
 
 
 # Spend/Cohort endpoints
-@app.post("/companies/{company_id}/cohorts/", response_model=CohortResponse, tags=["Cohorts"])
+@app.post("/companies/{company_id}/cohorts/", response_model=CohortResponse)
 async def create_cohort(company_id: int, cohort: CohortCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """Create a new cohort (S&M spend plan) for a company"""
     logger.info(
@@ -136,16 +109,15 @@ async def create_cohort(company_id: int, cohort: CohortCreate, db_ops: DatabaseO
         raise HTTPException(status_code=400, detail="Cohort for this month already exists")
 
     try:
-        db_cohort = db_ops.cohorts.create_cohort(
+        return db_ops.cohorts.create_cohort(
             company_id, cohort.cohort_month, cohort.planned_sm, cohort.sharing_percentage, cohort.cash_cap
         )
-        return CohortResponse.from_db(db_cohort)
     except Exception as e:
         logger.error("Failed to create cohort", company_id=company_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to create cohort")
 
 
-@app.get("/companies/{company_id}/cohorts/", response_model=List[CohortResponse], tags=["Cohorts"])
+@app.get("/companies/{company_id}/cohorts/", response_model=List[CohortResponse])
 async def list_cohorts(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """List all cohorts for a company"""
     logger.info("Listing cohorts", company_id=company_id)
@@ -155,12 +127,11 @@ async def list_cohorts(company_id: int, db_ops: DatabaseOperations = Depends(get
         logger.warning("Company not found for cohort listing", company_id=company_id)
         raise HTTPException(status_code=404, detail="Company not found")
 
-    db_cohorts = db_ops.cohorts.list_cohorts_by_company(company_id)
-    return [CohortResponse.from_db(cohort) for cohort in db_cohorts]
+    return db_ops.cohorts.list_cohorts_by_company(company_id)
 
 
 # Payment endpoints
-@app.post("/companies/{company_id}/payments/upload", tags=["Payments"])
+@app.post("/companies/{company_id}/payments/upload")
 async def upload_payments(
     company_id: int, file: UploadFile = File(...), db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
@@ -175,18 +146,17 @@ async def upload_payments(
     return result
 
 
-@app.get("/companies/{company_id}/payments/", response_model=List[PaymentResponse], tags=["Payments"])
-async def list_payments(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
+@app.get("/companies/{company_id}/payments/", response_model=List[PaymentResponse])
+async def list_payments(company_id: int, limit: int = 1000, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """List all payments for a company"""
-    logger.info("Listing payments", company_id=company_id)
+    logger.info("Listing payments", company_id=company_id, limit=limit)
 
     # Validate company exists
     if not db_ops.companies.company_exists(company_id):
         logger.warning("Company not found for payment listing", company_id=company_id)
         raise HTTPException(status_code=404, detail="Company not found")
 
-    db_payments = db_ops.payments.list_payments_by_company(company_id)
-    return [PaymentResponse.from_db(payment) for payment in db_payments]
+    return db_ops.payments.list_payments_by_company(company_id)
 
 
 # Trade endpoints removed - trading terms moved to cohort endpoints
@@ -197,20 +167,18 @@ async def list_payments(company_id: int, db_ops: DatabaseOperations = Depends(ge
 async def create_threshold(
     company_id: int, threshold: ThresholdCreate, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
-    db_threshold = db_ops.thresholds.create_threshold(
+    return db_ops.thresholds.create_threshold(
         company_id, threshold.payment_period_month, threshold.minimum_payment_percent
     )
-    return ThresholdResponse.from_db(db_threshold)
 
 
 @app.get("/companies/{company_id}/thresholds/", response_model=List[ThresholdResponse])
 async def list_thresholds(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
-    db_thresholds = db_ops.thresholds.list_thresholds_by_company(company_id)
-    return [ThresholdResponse.from_db(threshold) for threshold in db_thresholds]
+    return db_ops.thresholds.list_thresholds_by_company(company_id)
 
 
 # Analytics endpoints
-@app.get("/companies/{company_id}/metrics", tags=["Analytics"])
+@app.get("/companies/{company_id}/metrics")
 async def get_metrics(
     company_id: int, as_of: Optional[str] = None, db_ops: DatabaseOperations = Depends(get_db_operations)
 ) -> MetricsResponse:
@@ -229,11 +197,7 @@ async def get_metrics(
         if data["payments_df"].empty:
             logger.warning("No payments data found", company_id=company_id)
             return MetricsResponse(
-                owed_this_month=0.0,
-                breaches_count=0,
-                moic_to_date=0.0,
-                ltv_estimate=0.0,
-                cac_estimate=0.0,
+                owed_this_month=0.0, breaches_count=0, moic_to_date=0.0, ltv_estimate=0.0, cac_estimate=0.0
             )
 
         # Convert to cohort matrix
@@ -242,11 +206,7 @@ async def get_metrics(
         if data["spend_df"].empty:
             logger.warning("No spend data found", company_id=company_id)
             return MetricsResponse(
-                owed_this_month=0.0,
-                breaches_count=0,
-                moic_to_date=0.0,
-                ltv_estimate=0.0,
-                cac_estimate=0.0,
+                owed_this_month=0.0, breaches_count=0, moic_to_date=0.0, ltv_estimate=0.0, cac_estimate=0.0
             )
 
         spend_df = data["spend_df"].set_index("cohort")
@@ -279,11 +239,7 @@ async def get_metrics(
     except Exception as e:
         logger.error("Error calculating metrics", company_id=company_id, error=str(e))
         return MetricsResponse(
-            owed_this_month=0.0,
-            breaches_count=0,
-            moic_to_date=0.0,
-            ltv_estimate=0.0,
-            cac_estimate=0.0,
+            owed_this_month=0.0, breaches_count=0, moic_to_date=0.0, ltv_estimate=0.0, cac_estimate=0.0
         )
 
 
@@ -373,97 +329,45 @@ async def get_cashflows(
         return {"cohorts": []}
 
 
-@app.post("/companies/{company_id}/recalc", tags=["Analytics"])
-async def recalculate_cashflows(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
-    """Synchronously recalculate cashflows and return updated metrics for a company"""
-    logger.info("Cashflow recalculation requested", company_id=company_id)
+@app.post("/companies/{company_id}/recalc")
+async def trigger_recalculation(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
+    """Trigger recalculation of cashflows for a company"""
+    logger.info("Recalculation requested", company_id=company_id)
+
+    try:
+        # Create a recalculation job
+        job = db_ops.jobs.create_recalc_job(company_id, "manual")
+
+        # This would trigger the actual recalculation logic in a real implementation
+        # For now, mark as completed immediately
+        db_ops.jobs.update_job_status(job.id, "completed", "Manual recalculation completed")
+
+        logger.info("Recalculation completed", company_id=company_id, job_id=job.id)
+
+        return {"message": "Recalculation triggered", "company_id": company_id, "job_id": job.id, "status": "completed"}
+
+    except Exception as e:
+        logger.error("Recalculation failed", company_id=company_id, error=str(e))
+        return {"message": "Recalculation failed", "company_id": company_id, "error": str(e), "status": "failed"}
+
+
+# Jobs endpoints
+@app.get("/companies/{company_id}/jobs")
+async def list_jobs(company_id: int, limit: int = 50, db_ops: DatabaseOperations = Depends(get_db_operations)):
+    """List recent recalculation jobs for a company"""
+    logger.info("Listing jobs", company_id=company_id, limit=limit)
 
     # Validate company exists
     if not db_ops.companies.company_exists(company_id):
-        logger.warning("Company not found for recalculation", company_id=company_id)
+        logger.warning("Company not found for job listing", company_id=company_id)
         raise HTTPException(status_code=404, detail="Company not found")
 
     try:
-        # Get all company data for analytics
-        data = db_ops.analytics.get_company_data_for_analytics(company_id)
-
-        if data["payments_df"].empty:
-            logger.warning("No payments data found for recalculation", company_id=company_id)
-            return {
-                "message": "No payments data available for recalculation",
-                "company_id": company_id,
-                "metrics": {
-                    "owed_this_month": 0.0,
-                    "breaches_count": 0,
-                    "moic_to_date": 0.0,
-                    "ltv_estimate": 0.0,
-                    "cac_estimate": 0.0
-                }
-            }
-
-        # Convert to cohort matrix
-        cohort_df = payment_df_to_cohort_df(data["payments_df"])
-
-        if data["spend_df"].empty:
-            logger.warning("No spend data found for recalculation", company_id=company_id)
-            return {
-                "message": "No spend data available for recalculation",
-                "company_id": company_id,
-                "metrics": {
-                    "owed_this_month": 0.0,
-                    "breaches_count": 0,
-                    "moic_to_date": 0.0,
-                    "ltv_estimate": 0.0,
-                    "cac_estimate": 0.0
-                }
-            }
-
-        spend_df = data["spend_df"].set_index("cohort")
-
-        # Calculate cashflows
-        cashflows_df = get_cvf_cashflows_df(cohort_df, spend_df, data["thresholds"], data["cohort_trades"])
-
-        # Calculate updated metrics
-        total_spend = spend_df["spend"].sum()
-        total_payments = cohort_df.sum().sum()
-        total_cashflows = cashflows_df.sum().sum()
-
-        moic = total_payments / total_spend if total_spend > 0 else 0.0
-        ltv_estimate = total_payments / len(cohort_df) if len(cohort_df) > 0 else 0.0
-        cac_estimate = total_spend / len(cohort_df) if len(cohort_df) > 0 else 0.0
-
-        logger.info(
-            "Cashflow recalculation completed",
-            company_id=company_id,
-            total_cashflows=total_cashflows,
-            moic=moic,
-            cohorts_processed=len(cohort_df)
-        )
-
-        return {
-            "message": "Cashflows recalculated successfully",
-            "company_id": company_id,
-            "metrics": {
-                "owed_this_month": 0.0,  # Could calculate current month owed
-                "breaches_count": 0,     # Could calculate threshold breaches
-                "moic_to_date": moic,
-                "ltv_estimate": ltv_estimate,
-                "cac_estimate": cac_estimate
-            },
-            "summary": {
-                "total_payments": total_payments,
-                "total_spend": total_spend,
-                "total_cashflows": total_cashflows,
-                "cohorts_processed": len(cohort_df),
-                "payment_periods": len(cohort_df.columns) if len(cohort_df) > 0 else 0
-            }
-        }
-
+        jobs = db_ops.jobs.list_jobs_by_company(company_id, limit)
+        return {"jobs": jobs}
     except Exception as e:
-        logger.error("Cashflow recalculation failed", company_id=company_id, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Recalculation failed: {str(e)}")
-
-
+        logger.error("Failed to list jobs", company_id=company_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve jobs")
 
 
 # Additional utility endpoints
