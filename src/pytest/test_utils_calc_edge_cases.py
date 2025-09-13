@@ -5,6 +5,7 @@ Edge case and stress tests for calc.py functions
 import pytest
 import pandas as pd
 import numpy as np
+import time
 
 from src.python.utils.calc import (
     payment_df_to_cohort_df,
@@ -13,6 +14,7 @@ from src.python.utils.calc import (
 )
 
 
+@pytest.mark.unit
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
 
@@ -216,6 +218,7 @@ class TestEdgeCases:
         assert len(result) == 1  # All should be in same cohort (January 2024)
 
 
+@pytest.mark.unit
 class TestPerformanceConsiderations:
     """Test performance characteristics and memory usage"""
 
@@ -246,11 +249,9 @@ class TestPerformanceConsiderations:
         assert isinstance(result, pd.DataFrame)
         assert len(result) > 0
 
-    @pytest.mark.slow
+
     def test_computation_time_scaling(self):
         """Test that computation scales reasonably with data size"""
-        import time
-
         sizes = [100, 1000, 5000]
         times = []
 

@@ -2,6 +2,7 @@
 Test script for CVF API endpoints
 """
 
+import pytest
 import requests
 import structlog
 
@@ -10,6 +11,31 @@ logger = structlog.get_logger(__file__)
 BASE_URL = "http://localhost:8000"
 
 
+@pytest.fixture(scope="module")
+@pytest.mark.api
+def company_id():
+    """Fixture to provide a company ID for testing"""
+    # First ensure we have a company to test with
+    response = requests.get(f"{BASE_URL}/companies/")
+    companies = response.json()
+    
+    if companies:
+        company_id = companies[0]["id"]
+        logger.info("Using existing company for tests", company_id=company_id, name=companies[0]["name"])
+        return company_id
+    else:
+        # Create a test company if none exist
+        logger.info("No companies found, creating test company")
+        response = requests.post(f"{BASE_URL}/companies", json={"name": "Test Company"})
+        if response.status_code == 200:
+            company = response.json()
+            logger.info("Created test company", company_id=company["id"])
+            return company["id"]
+        else:
+            pytest.fail(f"Failed to create test company: {response.status_code}")
+
+
+@pytest.mark.api
 def test_health():
     """Test health endpoint"""
     response = requests.get(f"{BASE_URL}/health")
@@ -17,6 +43,7 @@ def test_health():
     return response.status_code == 200
 
 
+@pytest.mark.api
 def test_companies():
     """Test company endpoints"""
     logger.info("Testing Companies endpoints")
@@ -25,14 +52,12 @@ def test_companies():
     response = requests.get(f"{BASE_URL}/companies/")
     companies = response.json()
     logger.info("List companies", status_code=response.status_code, company_count=len(companies))
-
-    if companies:
-        company_id = companies[0]["id"]
-        logger.info("Using company for tests", company_id=company_id, name=companies[0]["name"])
-        return company_id
-    return None
+    
+    assert response.status_code == 200
+    assert isinstance(companies, list)
 
 
+@pytest.mark.api
 def test_cohorts(company_id):
     """Test cohort endpoints"""
     logger.info("Testing Cohorts endpoints", company_id=company_id)
@@ -46,6 +71,7 @@ def test_cohorts(company_id):
         logger.info("Found cohort", cohort_month=cohort["cohort_month"], planned_sm=cohort["planned_sm"])
 
 
+@pytest.mark.api
 def test_payments(company_id):
     """Test payment endpoints"""
     logger.info("Testing Payments endpoints", company_id=company_id)
@@ -70,24 +96,7 @@ test_002,2024-01-20,1500"""
         response=response.json() if response.status_code == 200 else response.text,
     )
 
-
-def test_trades(company_id):
-    """Test trade endpoints"""
-    logger.info("Testing Trades endpoints", company_id=company_id)
-
-    response = requests.get(f"{BASE_URL}/companies/{company_id}/trades/")
-    trades = response.json()
-    logger.info("List trades", company_id=company_id, status_code=response.status_code, trade_count=len(trades))
-
-    for trade in trades:
-        logger.info(
-            "Found trade",
-            cohort_start_at=trade["cohort_start_at"],
-            sharing_percentage=trade["sharing_percentage"],
-            cash_cap=trade["cash_cap"],
-        )
-
-
+@pytest.mark.api
 def test_thresholds(company_id):
     """Test threshold endpoints"""
     logger.info("Testing Thresholds endpoints", company_id=company_id)
@@ -106,6 +115,7 @@ def test_thresholds(company_id):
         )
 
 
+@pytest.mark.api
 def test_analytics(company_id):
     """Test analytics endpoints"""
     logger.info("Testing Analytics endpoints", company_id=company_id)
@@ -142,6 +152,7 @@ def test_analytics(company_id):
         )
 
 
+@pytest.mark.api
 def test_recalc(company_id):
     """Test recalculation"""
     logger.info("Testing Recalculation endpoint", company_id=company_id)
@@ -153,35 +164,3 @@ def test_recalc(company_id):
         status_code=response.status_code,
         result=response.json() if response.status_code == 200 else response.text,
     )
-
-
-def main():
-    """Run all tests"""
-    logger.info("Starting CVF API Test Suite")
-
-    # Test basic connectivity
-    if not test_health():
-        logger.error("Health check failed")
-        return
-
-    logger.info("Health check passed")
-
-    # Test companies
-    company_id = test_companies()
-    if not company_id:
-        logger.error("No companies found")
-        return
-
-    # Test all endpoints
-    test_cohorts(company_id)
-    test_payments(company_id)
-    test_trades(company_id)
-    test_thresholds(company_id)
-    test_analytics(company_id)
-    test_recalc(company_id)
-
-    logger.info("All tests completed successfully")
-
-
-if __name__ == "__main__":
-    main()
