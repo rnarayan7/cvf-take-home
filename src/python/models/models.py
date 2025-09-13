@@ -179,17 +179,6 @@ class MetricsResponse(BaseModel):
     cac_estimate: float
 
 
-class TradeTableRow(BaseModel):
-    cohort_month: str
-    actual: List[float]
-    predicted: List[float]
-
-
-class TradeTableResponse(BaseModel):
-    columns: List[str]
-    rows: List[TradeTableRow]
-
-
 class PeriodData(BaseModel):
     period: int
     payment: float
