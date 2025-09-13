@@ -1,143 +1,88 @@
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import date, datetime
+from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, Boolean, DateTime, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+Base = declarative_base()
 
 
-# Company schemas
-class CompanyBase(BaseModel):
-    name: str
+class Company(Base):
+    __tablename__ = "companies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    cohorts = relationship("Cohort", back_populates="company")
+    payments = relationship("Payment", back_populates="company")
+    thresholds = relationship("Threshold", back_populates="company")
 
 
-class CompanyCreate(CompanyBase):
-    pass
+class Cohort(Base):
+    __tablename__ = "cohorts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    cohort_month = Column(Date, nullable=False, index=True)
+    planned_sm = Column(Float, nullable=False)  # Planned Sales & Marketing spend
+
+    # Trading terms (moved from Trade model)
+    sharing_percentage = Column(Float, nullable=False, default=0.5)  # e.g., 0.32 for 32%
+    cash_cap = Column(Float, nullable=False, default=0.0)  # Cash cap for this cohort
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    company = relationship("Company", back_populates="cohorts")
 
 
-class CompanyResponse(CompanyBase):
-    id: int
-    created_at: datetime
+class Payment(Base):
+    __tablename__ = "payments"
 
-    class Config:
-        from_attributes = True
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    customer_id = Column(String, nullable=False, index=True)
+    payment_date = Column(Date, nullable=False, index=True)
+    cohort_month = Column(Date, nullable=False, index=True)  # Derived from first payment
+    amount = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-
-# Cohort schemas
-class CohortBase(BaseModel):
-    cohort_month: date
-    planned_sm: float
-    sharing_percentage: float = 0.5  # Default 50%
-    cash_cap: float = 0.0  # Default no cap
-
-
-class CohortCreate(CohortBase):
-    pass
+    # Relationships
+    company = relationship("Company", back_populates="payments")
 
 
-class CohortResponse(CohortBase):
-    id: int
-    company_id: int
-    created_at: datetime
+class Threshold(Base):
+    __tablename__ = "thresholds"
 
-    class Config:
-        from_attributes = True
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    payment_period_month = Column(Integer, nullable=False)  # 0, 1, 2, etc.
+    minimum_payment_percent = Column(Float, nullable=False)  # e.g., 0.15 for 15%
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-
-# Payment schemas
-class PaymentBase(BaseModel):
-    customer_id: str
-    payment_date: date
-    amount: float
+    # Relationships
+    company = relationship("Company", back_populates="thresholds")
 
 
-class PaymentCreate(PaymentBase):
-    pass
+class CashflowSnapshot(Base):
+    __tablename__ = "cashflow_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    cohort_month = Column(Date, nullable=False, index=True)
+    as_of_month = Column(Date, nullable=False, index=True)
+
+    # Calculated fields
+    planned_sm = Column(Float, nullable=False)
+    actual_sm = Column(Float)
+    cumulative_payments = Column(Float, nullable=False, default=0.0)
+    share_rate = Column(Float, nullable=False)  # Effective sharing rate
+    owed_this_month = Column(Float, nullable=False, default=0.0)
+    cumulative_shared = Column(Float, nullable=False, default=0.0)
+    at_cap = Column(Boolean, default=False)
+    flip_100_active = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
-class PaymentResponse(PaymentBase):
-    id: int
-    company_id: int
-    cohort_month: date
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# Trade schemas removed - trading terms moved to Cohort
-
-
-# Threshold schemas
-class ThresholdBase(BaseModel):
-    payment_period_month: int
-    minimum_payment_percent: float
-
-
-class ThresholdCreate(ThresholdBase):
-    pass
-
-
-class ThresholdResponse(ThresholdBase):
-    id: int
-    company_id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# Analytics response schemas
-class MetricsResponse(BaseModel):
-    owed_this_month: float
-    breaches_count: int
-    moic_to_date: float
-    ltv_estimate: float
-    cac_estimate: float
-
-
-class CohortTableRow(BaseModel):
-    cohort_month: str
-    actual: List[float]
-    predicted: List[float]
-
-
-class CohortTableResponse(BaseModel):
-    columns: List[str]
-    rows: List[CohortTableRow]
-
-
-class PeriodData(BaseModel):
-    period: int
-    payment: float
-    share_applied: float
-    collected: float
-    cumulative: float
-    status: str
-    threshold_failed: bool
-    capped: bool
-
-
-class CohortCashflowData(BaseModel):
-    cohort_id: int
-    cohort_month: str
-    sharing_percentage: float
-    cash_cap: float
-    cumulative_collected: float
-    periods: List[PeriodData]
-
-
-class CashflowResponse(BaseModel):
-    cohorts: List[CohortCashflowData]
-
-
-# Job schemas
-class JobResponse(BaseModel):
-    id: int
-    company_id: int
-    trigger: str
-    status: str
-    started_at: datetime
-    finished_at: Optional[datetime]
-    log: Optional[str]
-    error_message: Optional[str]
-
-    class Config:
-        from_attributes = True
