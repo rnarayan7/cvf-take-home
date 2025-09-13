@@ -46,12 +46,21 @@ def setup_environment():
 
 
 def initialize_database():
-    """Initialize database with tables and sample data"""
-    from src.python.db.init_db import init_database
+    """Initialize database with tables"""
+    from src.python.db.database import init_database
 
     logger.info("Initializing database")
     init_database()
     logger.info("Database initialized successfully")
+
+
+def seed_database(force_recreate=False):
+    """Seed database with sample data"""
+    from src.python.db.seed_data import seed_database
+    
+    logger.info("Seeding database with sample data", force_recreate=force_recreate)
+    seed_database(force_recreate=force_recreate)
+    logger.info("Database seeding completed")
 
 
 def run_server(host="0.0.0.0", port=8000, reload=True, log_level="info"):
@@ -96,6 +105,8 @@ def main():
         "--setup-only", action="store_true", help="Only setup environment and database, don't start server"
     )
     parser.add_argument("--skip-db-init", action="store_true", help="Skip database initialization")
+    parser.add_argument("--seed", action="store_true", help="Seed database with sample data")
+    parser.add_argument("--seed-force", action="store_true", help="Force recreate seed data (clears existing data)")
 
     args = parser.parse_args()
 
@@ -111,6 +122,10 @@ def main():
     # Initialize database unless skipped
     if not args.skip_db_init:
         initialize_database()
+
+    # Seed database if requested
+    if args.seed or args.seed_force:
+        seed_database(force_recreate=args.seed_force)
 
     # Run tests if requested
     if args.test:
