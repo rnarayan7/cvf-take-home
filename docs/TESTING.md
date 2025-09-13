@@ -184,18 +184,6 @@ When adding new functions to `calc.py`:
 - **Use fixtures** - Leverage pytest fixtures for consistent test data
 - **Test edge cases** - Include boundary conditions and error scenarios
 
-## Performance Testing
-
-Some tests are marked with `@pytest.mark.slow` for performance testing:
-- Large dataset handling
-- Memory efficiency verification
-- Computation time scaling
-
-Skip slow tests during development:
-```bash
-python run_tests.py fast
-```
-
 ## Debugging Failed Tests
 
 For debugging test failures:
