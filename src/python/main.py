@@ -211,134 +211,18 @@ async def list_thresholds(company_id: int, db_ops: DatabaseOperations = Depends(
     return [ThresholdResponse.from_db(threshold) for threshold in db_thresholds]
 
 
-# Analytics endpoints
-@app.get("/companies/{company_id}/metrics", tags=["Analytics"])
-async def get_metrics(
-    company_id: int, as_of: Optional[str] = None, db_ops: DatabaseOperations = Depends(get_db_operations)
-) -> MetricsResponse:
-    """Get company metrics for a specific month"""
-    logger.info("Getting metrics", company_id=company_id, as_of=as_of)
-
-    if as_of:
-        as_of_date = datetime.strptime(as_of, "%Y-%m").date()
-    else:
-        as_of_date = date.today().replace(day=1)
-
-    # Get all company data for analytics
-    try:
-        data = db_ops.analytics.get_company_data_for_analytics(company_id)
-
-        if data["payments_df"].empty:
-            logger.warning("No payments data found", company_id=company_id)
-            return MetricsResponse(
-                owed_this_month=0.0,
-                breaches_count=0,
-                moic_to_date=0.0,
-                ltv_estimate=0.0,
-                cac_estimate=0.0,
-            )
-
-        # Convert to cohort matrix
-        cohort_df = payment_df_to_cohort_df(data["payments_df"])
-
-        if data["spend_df"].empty:
-            logger.warning("No spend data found", company_id=company_id)
-            return MetricsResponse(
-                owed_this_month=0.0,
-                breaches_count=0,
-                moic_to_date=0.0,
-                ltv_estimate=0.0,
-                cac_estimate=0.0,
-            )
-
-        spend_df = data["spend_df"].set_index("cohort")
-
-        # Calculate cashflows
-        cashflows_df = get_cvf_cashflows_df(cohort_df, spend_df, data["thresholds"], data["cohort_trades"])
-
-        # Calculate metrics
-        total_owed = 0.0  # Could calculate current month owed here
-        total_spend = spend_df["spend"].sum()
-        total_payments = cohort_df.sum().sum()
-
-        # Simple calculations - can be enhanced
-        moic = total_payments / total_spend if total_spend > 0 else 0.0
-        ltv_estimate = total_payments / len(cohort_df) if len(cohort_df) > 0 else 0.0
-        cac_estimate = total_spend / len(cohort_df) if len(cohort_df) > 0 else 0.0
-
-        logger.info(
-            "Metrics calculated", company_id=company_id, moic=moic, ltv_estimate=ltv_estimate, cac_estimate=cac_estimate
-        )
-
-        return MetricsResponse(
-            owed_this_month=total_owed,
-            breaches_count=0,  # Calculate based on thresholds
-            moic_to_date=moic,
-            ltv_estimate=ltv_estimate,
-            cac_estimate=cac_estimate,
-        )
-
-    except Exception as e:
-        logger.error("Error calculating metrics", company_id=company_id, error=str(e))
-        return MetricsResponse(
-            owed_this_month=0.0,
-            breaches_count=0,
-            moic_to_date=0.0,
-            ltv_estimate=0.0,
-            cac_estimate=0.0,
-        )
-
-
-@app.get("/companies/{company_id}/cohorts_table")
-async def get_cohorts_table(
-    company_id: int, include_predicted: bool = True, db_ops: DatabaseOperations = Depends(get_db_operations)
-):
-    """Get cohort payment matrix with actual and predicted values"""
-    logger.info("Getting cohorts table", company_id=company_id, include_predicted=include_predicted)
-
-    try:
-        # Get payments data
-        payments_df = db_ops.payments.get_payments_dataframe(company_id)
-        if payments_df.empty:
-            logger.warning("No payments found for cohorts table", company_id=company_id)
-            return {"columns": [], "rows": []}
-
-        # Convert to cohort matrix
-        cohort_df = payment_df_to_cohort_df(payments_df)
-
-        # Format for frontend
-        columns = [f"payment_period_{i}" for i in range(len(cohort_df.columns))]
-        rows = []
-
-        for cohort_month, row in cohort_df.iterrows():
-            actual_values = [float(val) if pd.notna(val) else 0.0 for val in row.values]
-            predicted_values = actual_values.copy()  # Simplified - add prediction logic
-
-            rows.append(
-                {"cohort_month": cohort_month.strftime("%Y-%m"), "actual": actual_values, "predicted": predicted_values}
-            )
-
-        logger.info("Cohort table generated", company_id=company_id, cohort_count=len(rows), period_count=len(columns))
-
-        return {"columns": columns, "rows": rows}
-
-    except Exception as e:
-        logger.error("Error generating cohorts table", company_id=company_id, error=str(e))
-        return {"columns": [], "rows": []}
-
-
 @app.get("/companies/{company_id}/cashflows")
 async def get_cashflows(
-    company_id: int, as_of: Optional[str] = None, db_ops: DatabaseOperations = Depends(get_db_operations)
+    company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)
 ) -> Dict[str, Any]:
     """Get cashflow data with cohort trading details"""
-    logger.info("Getting cashflows", company_id=company_id, as_of=as_of)
+    logger.info("Getting cashflows", company_id=company_id)
 
     try:
-        cohorts = db_ops.cohorts.list_cohorts_by_company(company_id)
+        trades = db_ops.trades.list_trades_by_company(company_id)
 
-        cashflow_cohorts = []
-        for cohort in cohorts:
+        cashflows = []
+        for trade in trades:
             # Simplified cashflow calculation - could be enhanced with real calculations
             periods = []
             cumulative = 0.0
@@ -347,171 +231,32 @@ async def get_cashflows(
                 period_data = {
                     "period": i,
                     "payment": 0.0,
-                    "share_applied": cohort.sharing_percentage,
+                    "share_applied": trade.sharing_percentage,
                     "collected": 0.0,
                     "cumulative": cumulative,
                     "status": "Active",
                     "threshold_failed": False,
-                    "capped": cumulative >= cohort.cash_cap,
+                    "capped": cumulative >= trade.cash_cap,
                 }
                 periods.append(period_data)
 
-            cohort_data = {
-                "cohort_id": cohort.id,
-                "cohort_month": cohort.cohort_month.strftime("%Y-%m"),
-                "sharing_percentage": cohort.sharing_percentage,
-                "cash_cap": cohort.cash_cap,
+            trade_data = {
+                "cohort_id": trade.id,
+                "cohort_month": trade.cohort_month.strftime("%Y-%m"),
+                "sharing_percentage": trade.sharing_percentage,
+                "cash_cap": trade.cash_cap,
                 "cumulative_collected": cumulative,
                 "periods": periods,
             }
-            cashflow_cohorts.append(cohort_data)
+            cashflows.append(trade_data)
 
-        logger.info("Cashflows generated", company_id=company_id, cohort_count=len(cashflow_cohorts))
+        logger.info("Cashflows generated", company_id=company_id, trade_count=len(cashflows))
 
-        return {"cohorts": cashflow_cohorts}
+        return {"trades": cashflows}
 
     except Exception as e:
         logger.error("Error generating cashflows", company_id=company_id, error=str(e))
         return {"cohorts": []}
-
-
-@app.post("/companies/{company_id}/recalc", tags=["Analytics"])
-async def recalculate_cashflows(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
-    """Synchronously recalculate cashflows and return updated metrics for a company"""
-    logger.info("Cashflow recalculation requested", company_id=company_id)
-
-    # Validate company exists
-    if not db_ops.companies.company_exists(company_id):
-        logger.warning("Company not found for recalculation", company_id=company_id)
-        raise HTTPException(status_code=404, detail="Company not found")
-
-    try:
-        # Get all company data for analytics
-        data = db_ops.analytics.get_company_data_for_analytics(company_id)
-
-        if data["payments_df"].empty:
-            logger.warning("No payments data found for recalculation", company_id=company_id)
-            return {
-                "message": "No payments data available for recalculation",
-                "company_id": company_id,
-                "metrics": {
-                    "owed_this_month": 0.0,
-                    "breaches_count": 0,
-                    "moic_to_date": 0.0,
-                    "ltv_estimate": 0.0,
-                    "cac_estimate": 0.0
-                }
-            }
-
-        # Convert to cohort matrix
-        cohort_df = payment_df_to_cohort_df(data["payments_df"])
-
-        if data["spend_df"].empty:
-            logger.warning("No spend data found for recalculation", company_id=company_id)
-            return {
-                "message": "No spend data available for recalculation",
-                "company_id": company_id,
-                "metrics": {
-                    "owed_this_month": 0.0,
-                    "breaches_count": 0,
-                    "moic_to_date": 0.0,
-                    "ltv_estimate": 0.0,
-                    "cac_estimate": 0.0
-                }
-            }
-
-        spend_df = data["spend_df"].set_index("cohort")
-
-        # Calculate cashflows
-        cashflows_df = get_cvf_cashflows_df(cohort_df, spend_df, data["thresholds"], data["cohort_trades"])
-
-        # Calculate updated metrics
-        total_spend = spend_df["spend"].sum()
-        total_payments = cohort_df.sum().sum()
-        total_cashflows = cashflows_df.sum().sum()
-
-        moic = total_payments / total_spend if total_spend > 0 else 0.0
-        ltv_estimate = total_payments / len(cohort_df) if len(cohort_df) > 0 else 0.0
-        cac_estimate = total_spend / len(cohort_df) if len(cohort_df) > 0 else 0.0
-
-        logger.info(
-            "Cashflow recalculation completed",
-            company_id=company_id,
-            total_cashflows=total_cashflows,
-            moic=moic,
-            cohorts_processed=len(cohort_df)
-        )
-
-        return {
-            "message": "Cashflows recalculated successfully",
-            "company_id": company_id,
-            "metrics": {
-                "owed_this_month": 0.0,  # Could calculate current month owed
-                "breaches_count": 0,     # Could calculate threshold breaches
-                "moic_to_date": moic,
-                "ltv_estimate": ltv_estimate,
-                "cac_estimate": cac_estimate
-            },
-            "summary": {
-                "total_payments": total_payments,
-                "total_spend": total_spend,
-                "total_cashflows": total_cashflows,
-                "cohorts_processed": len(cohort_df),
-                "payment_periods": len(cohort_df.columns) if len(cohort_df) > 0 else 0
-            }
-        }
-
-    except Exception as e:
-        logger.error("Cashflow recalculation failed", company_id=company_id, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Recalculation failed: {str(e)}")
-
-
-
-
-# Additional utility endpoints
-@app.get("/companies/{company_id}/stats")
-async def get_company_stats(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
-    """Get basic statistics about a company's data"""
-    logger.info("Getting company stats", company_id=company_id)
-
-    # Validate company exists
-    if not db_ops.companies.company_exists(company_id):
-        logger.warning("Company not found for stats", company_id=company_id)
-        raise HTTPException(status_code=404, detail="Company not found")
-
-    try:
-        payments = db_ops.payments.list_payments_by_company(company_id)
-        cohorts = db_ops.cohorts.list_cohorts_by_company(company_id)
-        thresholds = db_ops.thresholds.list_thresholds_by_company(company_id)
-
-        stats = {
-            "payments_count": len(payments),
-            "cohorts_count": len(cohorts),
-            "thresholds_count": len(thresholds),
-            "date_range": {
-                "first_payment": min(p.payment_date for p in payments) if payments else None,
-                "last_payment": max(p.payment_date for p in payments) if payments else None,
-            },
-        }
-
-        logger.info("Company stats generated", company_id=company_id, stats=stats)
-        return stats
-
-    except Exception as e:
-        logger.error("Failed to generate stats", company_id=company_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to generate statistics")
-
-
-# Spend endpoints - All operations are scoped to companies
-
-
-
-
-
-
-
-
-
 
 @app.get("/companies/{company_id}/spends/", response_model=List[SpendResponse], tags=["Spends"])
 async def list_company_spends(
@@ -746,3 +491,113 @@ async def update_company_spend(
     except Exception as e:
         logger.error("Failed to update company spend", company_id=company_id, spend_id=spend_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to update spend")
+
+
+# Analytics endpoints
+@app.get("/companies/{company_id}/metrics", tags=["Analytics"])
+async def get_metrics(
+    company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)
+) -> MetricsResponse:
+    """Get company metrics for a specific month"""
+    logger.info("Getting metrics", company_id=company_id)
+
+    # Get all company data for analytics
+    try:
+        data = db_ops.analytics.get_company_data_for_analytics(company_id)
+
+        if data["payments_df"].empty:
+            logger.warning("No payments data found", company_id=company_id)
+            return MetricsResponse(
+                owed_this_month=0.0,
+                breaches_count=0,
+                moic_to_date=0.0,
+                ltv_estimate=0.0,
+                cac_estimate=0.0,
+            )
+
+        # Convert to cohort matrix
+        cohort_df = payment_df_to_cohort_df(data["payments_df"])
+
+        if data["spend_df"].empty:
+            logger.warning("No spend data found", company_id=company_id)
+            return MetricsResponse(
+                owed_this_month=0.0,
+                breaches_count=0,
+                moic_to_date=0.0,
+                ltv_estimate=0.0,
+                cac_estimate=0.0,
+            )
+
+        spend_df = data["spend_df"].set_index("cohort")
+
+        # Calculate cashflows
+        cashflows_df = get_cvf_cashflows_df(cohort_df, spend_df, data["thresholds"], data["cohort_trades"])
+
+        # Calculate metrics
+        total_owed = 0.0  # Could calculate current month owed here
+        total_spend = spend_df["spend"].sum()
+        total_payments = cohort_df.sum().sum()
+
+        # Simple calculations - can be enhanced
+        moic = total_payments / total_spend if total_spend > 0 else 0.0
+        ltv_estimate = total_payments / len(cohort_df) if len(cohort_df) > 0 else 0.0
+        cac_estimate = total_spend / len(cohort_df) if len(cohort_df) > 0 else 0.0
+
+        logger.info(
+            "Metrics calculated", company_id=company_id, moic=moic, ltv_estimate=ltv_estimate, cac_estimate=cac_estimate
+        )
+
+        return MetricsResponse(
+            owed_this_month=total_owed,
+            breaches_count=0,  # Calculate based on thresholds
+            moic_to_date=moic,
+            ltv_estimate=ltv_estimate,
+            cac_estimate=cac_estimate,
+        )
+
+    except Exception as e:
+        logger.error("Error calculating metrics", company_id=company_id, error=str(e))
+        return MetricsResponse(
+            owed_this_month=0.0,
+            breaches_count=0,
+            moic_to_date=0.0,
+            ltv_estimate=0.0,
+            cac_estimate=0.0,
+        )
+    
+@app.get("/companies/{company_id}/cohorts_table")
+async def get_cohorts_table(
+    company_id: int, include_predicted: bool = True, db_ops: DatabaseOperations = Depends(get_db_operations)
+):
+    """Get cohort payment matrix with actual and predicted values"""
+    logger.info("Getting cohorts table", company_id=company_id, include_predicted=include_predicted)
+
+    try:
+        # Get payments data
+        payments_df = db_ops.payments.get_payments_dataframe(company_id)
+        if payments_df.empty:
+            logger.warning("No payments found for cohorts table", company_id=company_id)
+            return {"columns": [], "rows": []}
+
+        # Convert to cohort matrix
+        cohort_df = payment_df_to_cohort_df(payments_df)
+
+        # Format for frontend
+        columns = [f"payment_period_{i}" for i in range(len(cohort_df.columns))]
+        rows = []
+
+        for cohort_month, row in cohort_df.iterrows():
+            actual_values = [float(val) if pd.notna(val) else 0.0 for val in row.values]
+            predicted_values = actual_values.copy()  # Simplified - add prediction logic
+
+            rows.append(
+                {"cohort_month": cohort_month.strftime("%Y-%m"), "actual": actual_values, "predicted": predicted_values}
+            )
+
+        logger.info("Cohort table generated", company_id=company_id, cohort_count=len(rows), period_count=len(columns))
+
+        return {"columns": columns, "rows": rows}
+
+    except Exception as e:
+        logger.error("Error generating cohorts table", company_id=company_id, error=str(e))
+        return {"columns": [], "rows": []}
