@@ -2,6 +2,7 @@
 Test script for CSV processor functionality
 """
 
+import pytest
 import io
 import asyncio
 from fastapi import UploadFile
@@ -24,6 +25,7 @@ def create_mock_upload_file(filename: str, content: str) -> UploadFile:
     return UploadFile(filename=filename, file=file_like)
 
 
+@pytest.mark.unit
 async def test_valid_payments_csv():
     """Test processing a valid payments CSV"""
     logger.info("Testing valid payments CSV processing")
@@ -61,6 +63,7 @@ async def test_valid_payments_csv():
         return False
 
 
+@pytest.mark.unit
 async def test_invalid_csv_format():
     """Test handling of invalid CSV format"""
     logger.info("Testing invalid CSV format handling")
@@ -80,6 +83,7 @@ async def test_invalid_csv_format():
         return True
 
 
+@pytest.mark.unit
 async def test_missing_columns():
     """Test handling of missing required columns"""
     logger.info("Testing missing columns handling")
@@ -105,6 +109,7 @@ async def test_missing_columns():
         return True
 
 
+@pytest.mark.unit
 def test_non_csv_file():
     """Test handling of non-CSV file extensions"""
     logger.info("Testing non-CSV file handling")
@@ -115,24 +120,18 @@ def test_non_csv_file():
     try:
         processor.validate_csv_file(upload_file)
         logger.error("Should have failed but didn't")
-        return False
+        assert(False)
     except Exception as e:
         logger.info("Correctly rejected non-CSV file", error=str(e))
-        return True
 
 
+@pytest.mark.unit
 async def test_factory_function():
     """Test the factory function"""
     logger.info("Testing factory function")
 
     processor = get_payments_csv_processor()
-
-    if isinstance(processor, PaymentsCSVProcessor):
-        logger.info("Factory function works correctly")
-        return True
-    else:
-        logger.error("Factory function returned wrong type")
-        return False
+    assert(isinstance(processor, PaymentsCSVProcessor))
 
 
 async def main():

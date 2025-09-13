@@ -17,6 +17,7 @@ from src.python.utils.calc import (
 )
 
 
+@pytest.mark.unit
 class TestPaymentDfToCohortDf:
     """Tests for payment_df_to_cohort_df function"""
 
@@ -84,6 +85,7 @@ class TestPaymentDfToCohortDf:
         assert result.iloc[0, 0] == 150.0  # Should sum both payments
 
 
+@pytest.mark.unit
 class TestApplyPredictionsToCohortDf:
     """Tests for apply_predictions_to_cohort_df function"""
 
@@ -174,6 +176,7 @@ class TestApplyPredictionsToCohortDf:
         assert result.loc[feb_cohort, 3] == 0.0
 
 
+@pytest.mark.unit
 class TestApplyThresholdToCohortDf:
     """Tests for apply_threshold_to_cohort_df function"""
 
@@ -252,6 +255,7 @@ class TestApplyThresholdToCohortDf:
         assert isinstance(result, pd.DataFrame)
 
 
+@pytest.mark.unit
 class TestGetCvfCashflowsDf:
     """Tests for get_cvf_cashflows_df function"""
 
@@ -371,6 +375,7 @@ class TestGetCvfCashflowsDf:
         assert len(result) == 0
 
 
+@pytest.mark.unit
 class TestCalculateLtvCacMetrics:
     """Tests for calculate_ltv_cac_metrics function"""
 
@@ -420,6 +425,7 @@ class TestCalculateLtvCacMetrics:
         assert result["cac_estimate"] == 0.0
 
 
+@pytest.mark.unit
 class TestCalculateCurrentMonthOwed:
     """Tests for calculate_current_month_owed function"""
 
@@ -451,6 +457,7 @@ class TestCalculateCurrentMonthOwed:
         assert result == 300.0  # 100 + 200
 
 
+@pytest.mark.unit
 class TestIntegrationScenarios:
     """Integration tests combining multiple functions"""
 
