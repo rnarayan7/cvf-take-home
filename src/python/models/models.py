@@ -31,19 +31,18 @@ class CompanyResponse(CompanyBase):
         )
 
 
-# Cohort schemas
-class CohortBase(BaseModel):
+# Trade schemas
+class TradeBase(BaseModel):
     cohort_month: date
-    planned_sm: float
     sharing_percentage: float = 0.5  # Default 50%
     cash_cap: float = 0.0  # Default no cap
 
 
-class CohortCreate(CohortBase):
+class TradeCreate(TradeBase):
     pass
 
 
-class CohortResponse(CohortBase):
+class TradeResponse(TradeBase):
     id: int
     company_id: int
     created_at: Optional[datetime] = None
@@ -52,16 +51,15 @@ class CohortResponse(CohortBase):
         from_attributes = True
     
     @classmethod
-    def from_db(cls, cohort: db_schemas.Cohort) -> CohortResponse:
-        """Convert Cohort DB model to CohortResponse API schema"""
+    def from_db(cls, trade: db_schemas.Trade) -> TradeResponse:
+        """Convert Trade DB model to TradeResponse API schema"""
         return cls(
-            id=cohort.id,
-            company_id=cohort.company_id,
-            cohort_month=cohort.cohort_month,
-            planned_sm=cohort.planned_sm,
-            sharing_percentage=cohort.sharing_percentage,
-            cash_cap=cohort.cash_cap,
-            created_at=cohort.created_at,
+            id=trade.id,
+            company_id=trade.company_id,
+            cohort_month=trade.cohort_month,
+            sharing_percentage=trade.sharing_percentage,
+            cash_cap=trade.cash_cap,
+            created_at=trade.created_at,
         )
 
 
@@ -129,6 +127,49 @@ class ThresholdResponse(ThresholdBase):
         )
 
 
+# Spend schemas
+class SpendBase(BaseModel):
+    company_id: int
+    cohort_month: date
+    spend: float
+
+
+class SpendCreate(SpendBase):
+    cohort_month: date
+    spend: float
+
+
+class SpendUpdate(BaseModel):
+    company_id: Optional[int] = None
+    cohort_month: Optional[date] = None
+    spend: Optional[float] = None
+
+
+class SpendResponse(SpendBase):
+    id: int
+    created_at: Optional[datetime] = None
+    company: Optional[CompanyResponse] = None
+
+    class Config:
+        from_attributes = True
+    
+    @classmethod
+    def from_db(cls, spend: "db_schemas.Spend", include_company: bool = False) -> "SpendResponse":
+        """Convert Spend DB model to SpendResponse API schema"""
+        response = cls(
+            id=spend.id,
+            company_id=spend.company_id,
+            cohort_month=spend.cohort_month,
+            spend=spend.spend,
+            created_at=spend.created_at,
+        )
+        
+        if include_company and spend.company:
+            response.company = CompanyResponse.from_db(spend.company)
+            
+        return response
+
+
 # Analytics response schemas
 class MetricsResponse(BaseModel):
     owed_this_month: float
@@ -138,15 +179,15 @@ class MetricsResponse(BaseModel):
     cac_estimate: float
 
 
-class CohortTableRow(BaseModel):
+class TradeTableRow(BaseModel):
     cohort_month: str
     actual: List[float]
     predicted: List[float]
 
 
-class CohortTableResponse(BaseModel):
+class TradeTableResponse(BaseModel):
     columns: List[str]
-    rows: List[CohortTableRow]
+    rows: List[TradeTableRow]
 
 
 class PeriodData(BaseModel):
@@ -160,8 +201,8 @@ class PeriodData(BaseModel):
     capped: bool
 
 
-class CohortCashflowData(BaseModel):
-    cohort_id: int
+class TradeCashflowData(BaseModel):
+    trade_id: int
     cohort_month: str
     sharing_percentage: float
     cash_cap: float
@@ -170,6 +211,6 @@ class CohortCashflowData(BaseModel):
 
 
 class CashflowResponse(BaseModel):
-    cohorts: List[CohortCashflowData]
+    trades: List[TradeCashflowData]
 
 

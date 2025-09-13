@@ -14,22 +14,22 @@ class Company(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    cohorts = relationship("Cohort", back_populates="company")
+    trades = relationship("Trade", back_populates="company")
     payments = relationship("Payment", back_populates="company")
     thresholds = relationship("Threshold", back_populates="company")
+    spends = relationship("Spend", back_populates="company")
 
 
-class Cohort(Base):
-    __tablename__ = "cohorts"
+class Trade(Base):
+    __tablename__ = "trades"
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
     cohort_month = Column(Date, nullable=False, index=True)
-    planned_sm = Column(Numeric, nullable=False)  # Planned Sales & Marketing spend
 
-    # Trading terms (moved from Trade model)
+    # Trading terms
     sharing_percentage = Column(Numeric, nullable=False, default=0.5)  # e.g., 0.32 for 32%
-    cash_cap = Column(Numeric, nullable=False, default=0.0)  # Cash cap for this cohort
+    cash_cap = Column(Numeric, nullable=False, default=0.0)  # Cash cap for this trade
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -41,7 +41,7 @@ class Cohort(Base):
     )
 
     # Relationships
-    company = relationship("Company", back_populates="cohorts")
+    company = relationship("Company", back_populates="trades")
 
 
 class Payment(Base):
@@ -78,24 +78,22 @@ class Threshold(Base):
     company = relationship("Company", back_populates="thresholds")
 
 
-class CashflowSnapshot(Base):
-    __tablename__ = "cashflow_snapshots"
+class Spend(Base):
+    __tablename__ = "spends"
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
     cohort_month = Column(Date, nullable=False, index=True)
-    as_of_month = Column(Date, nullable=False, index=True)
-
-    # Calculated fields
-    planned_sm = Column(Numeric, nullable=False)
-    actual_sm = Column(Numeric)
-    cumulative_payments = Column(Numeric, nullable=False, default=0.0)
-    share_rate = Column(Numeric, nullable=False)  # Effective sharing rate
-    owed_this_month = Column(Numeric, nullable=False, default=0.0)
-    cumulative_shared = Column(Numeric, nullable=False, default=0.0)
-    at_cap = Column(Boolean, default=False)
-    flip_100_active = Column(Boolean, default=False)
-
+    spend = Column(Numeric, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('company_id', 'cohort_month', name='unique_company_spend_cohort_month'),
+        CheckConstraint('spend >= 0', name='check_spend_positive'),
+    )
+
+    # Relationships
+    company = relationship("Company", back_populates="spends")
 
 

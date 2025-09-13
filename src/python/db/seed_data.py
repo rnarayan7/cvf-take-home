@@ -8,7 +8,7 @@ import structlog
 from datetime import datetime, date
 
 from src.python.db.database import engine
-from src.python.db.schemas import Company, Cohort, Payment, Threshold, CashflowSnapshot
+from src.python.db.schemas import Company, Trade, Payment, Threshold, Spend
 
 logger = structlog.get_logger(__file__)
 
@@ -23,7 +23,19 @@ def seed_companies(session):
     companies_data = [
         {"name": "Acme Corp"},
         {"name": "TechStart Inc"},
-        {"name": "GrowthCo"}
+        {"name": "GrowthCo"},
+        {"name": "DataDriven Solutions"},
+        {"name": "CloudFirst Technologies"},
+        {"name": "AI Innovations Ltd"},
+        {"name": "ScaleUp Ventures"},
+        {"name": "FinTech Masters"},
+        {"name": "EcoTech Green"},
+        {"name": "HealthTech Plus"},
+        {"name": "EdTech Revolution"},
+        {"name": "RetailTech Pro"},
+        {"name": "SecurityFirst Systems"},
+        {"name": "MediaStream Networks"},
+        {"name": "LogisticsPro Solutions"}
     ]
     
     created_companies = {}
@@ -47,129 +59,382 @@ def seed_companies(session):
     return created_companies
 
 
-def seed_cohorts(session, companies):
-    """Seed cohorts table with sample data"""
-    logger.info("Seeding cohorts")
+def seed_trades(session, companies):
+    """Seed trades table with sample data"""
+    logger.info("Seeding trades")
     
-    cohorts_data = [
+    trades_data = [
         {
             "company_name": "Acme Corp",
-            "cohorts": [
-                {
-                    "cohort_month": date(2024, 1, 1),
-                    "planned_sm": 100000.0,
-                    "sharing_percentage": 0.35,
-                    "cash_cap": 150000.0
-                },
-                {
-                    "cohort_month": date(2024, 2, 1),
-                    "planned_sm": 120000.0,
-                    "sharing_percentage": 0.40,
-                    "cash_cap": 180000.0
-                },
-                {
-                    "cohort_month": date(2024, 3, 1),
-                    "planned_sm": 90000.0,
-                    "sharing_percentage": 0.32,
-                    "cash_cap": 120000.0
-                }
+            "trades": [
+                {"cohort_month": date(2023, 10, 1), "sharing_percentage": 0.30, "cash_cap": 120000.0},
+                {"cohort_month": date(2023, 11, 1), "sharing_percentage": 0.32, "cash_cap": 140000.0},
+                {"cohort_month": date(2023, 12, 1), "sharing_percentage": 0.35, "cash_cap": 165000.0},
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.35, "cash_cap": 150000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.40, "cash_cap": 180000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.32, "cash_cap": 135000.0},
+                {"cohort_month": date(2024, 4, 1), "sharing_percentage": 0.38, "cash_cap": 195000.0},
+                {"cohort_month": date(2024, 5, 1), "sharing_percentage": 0.36, "cash_cap": 157000.0}
             ]
         },
         {
             "company_name": "TechStart Inc",
-            "cohorts": [
-                {
-                    "cohort_month": date(2024, 1, 1),
-                    "planned_sm": 50000.0,
-                    "sharing_percentage": 0.45,
-                    "cash_cap": 75000.0
-                },
-                {
-                    "cohort_month": date(2024, 2, 1),
-                    "planned_sm": 60000.0,
-                    "sharing_percentage": 0.42,
-                    "cash_cap": 90000.0
-                }
+            "trades": [
+                {"cohort_month": date(2023, 11, 1), "sharing_percentage": 0.40, "cash_cap": 65000.0},
+                {"cohort_month": date(2023, 12, 1), "sharing_percentage": 0.42, "cash_cap": 80000.0},
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.45, "cash_cap": 75000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.42, "cash_cap": 90000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.44, "cash_cap": 105000.0},
+                {"cohort_month": date(2024, 4, 1), "sharing_percentage": 0.43, "cash_cap": 97000.0}
             ]
         },
         {
             "company_name": "GrowthCo",
-            "cohorts": [
-                {
-                    "cohort_month": date(2024, 2, 1),
-                    "planned_sm": 200000.0,
-                    "sharing_percentage": 0.30,
-                    "cash_cap": 300000.0
-                }
+            "trades": [
+                {"cohort_month": date(2023, 12, 1), "sharing_percentage": 0.28, "cash_cap": 270000.0},
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.30, "cash_cap": 330000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.30, "cash_cap": 300000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.32, "cash_cap": 375000.0},
+                {"cohort_month": date(2024, 4, 1), "sharing_percentage": 0.29, "cash_cap": 285000.0}
+            ]
+        },
+        {
+            "company_name": "DataDriven Solutions",
+            "trades": [
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.38, "cash_cap": 127000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.40, "cash_cap": 138000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.35, "cash_cap": 117000.0},
+                {"cohort_month": date(2024, 4, 1), "sharing_percentage": 0.42, "cash_cap": 157000.0}
+            ]
+        },
+        {
+            "company_name": "CloudFirst Technologies",
+            "trades": [
+                {"cohort_month": date(2023, 12, 1), "sharing_percentage": 0.33, "cash_cap": 210000.0},
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.36, "cash_cap": 240000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.34, "cash_cap": 202000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.38, "cash_cap": 262000.0}
+            ]
+        },
+        {
+            "company_name": "AI Innovations Ltd",
+            "trades": [
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.41, "cash_cap": 180000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.39, "cash_cap": 165000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.43, "cash_cap": 217000.0}
+            ]
+        },
+        {
+            "company_name": "ScaleUp Ventures",
+            "trades": [
+                {"cohort_month": date(2023, 11, 1), "sharing_percentage": 0.35, "cash_cap": 90000.0},
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.37, "cash_cap": 112000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.40, "cash_cap": 127000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.41, "cash_cap": 142000.0}
+            ]
+        },
+        {
+            "company_name": "FinTech Masters",
+            "trades": [
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.28, "cash_cap": 300000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.30, "cash_cap": 277000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.32, "cash_cap": 345000.0}
+            ]
+        },
+        {
+            "company_name": "EcoTech Green",
+            "trades": [
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.45, "cash_cap": 105000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.46, "cash_cap": 120000.0},
+                {"cohort_month": date(2024, 4, 1), "sharing_percentage": 0.48, "cash_cap": 135000.0}
+            ]
+        },
+        {
+            "company_name": "HealthTech Plus",
+            "trades": [
+                {"cohort_month": date(2024, 1, 1), "sharing_percentage": 0.34, "cash_cap": 225000.0},
+                {"cohort_month": date(2024, 2, 1), "sharing_percentage": 0.36, "cash_cap": 247000.0},
+                {"cohort_month": date(2024, 3, 1), "sharing_percentage": 0.33, "cash_cap": 210000.0}
             ]
         }
     ]
     
-    created_cohorts = {}
-    for company_cohorts in cohorts_data:
-        company_name = company_cohorts["company_name"]
+    created_trades = {}
+    for company_trades in trades_data:
+        company_name = company_trades["company_name"]
         company = companies[company_name]
         
-        for cohort_data in company_cohorts["cohorts"]:
-            # Check if cohort already exists
-            existing = session.query(Cohort).filter_by(
+        for trade_data in company_trades["trades"]:
+            # Check if trade already exists
+            existing = session.query(Trade).filter_by(
                 company_id=company.id,
-                cohort_month=cohort_data["cohort_month"]
+                cohort_month=trade_data["cohort_month"]
             ).first()
             
             if existing:
-                logger.info("Cohort already exists", 
+                logger.info("Trade already exists", 
                            company=company_name,
-                           cohort_month=cohort_data["cohort_month"])
-                cohort_key = f"{company_name}_{cohort_data['cohort_month']}"
-                created_cohorts[cohort_key] = existing
+                           cohort_month=trade_data["cohort_month"])
+                trade_key = f"{company_name}_{trade_data['cohort_month']}"
+                created_trades[trade_key] = existing
                 continue
                 
-            cohort = Cohort(
+            trade = Trade(
                 company_id=company.id,
-                cohort_month=cohort_data["cohort_month"],
-                planned_sm=cohort_data["planned_sm"],
-                sharing_percentage=cohort_data["sharing_percentage"],
-                cash_cap=cohort_data["cash_cap"],
+                cohort_month=trade_data["cohort_month"],
+                sharing_percentage=trade_data["sharing_percentage"],
+                cash_cap=trade_data["cash_cap"],
                 created_at=datetime.utcnow()
             )
-            session.add(cohort)
+            session.add(trade)
             session.flush()
             
-            cohort_key = f"{company_name}_{cohort_data['cohort_month']}"
-            created_cohorts[cohort_key] = cohort
-            logger.info("Created cohort",
+            trade_key = f"{company_name}_{trade_data['cohort_month']}"
+            created_trades[trade_key] = trade
+            logger.info("Created trade",
                        company=company_name,
-                       cohort_month=cohort_data["cohort_month"],
-                       planned_sm=cohort_data["planned_sm"])
+                       cohort_month=trade_data["cohort_month"],
+                       sharing_percentage=trade_data["sharing_percentage"],
+                       cash_cap=trade_data["cash_cap"])
     
-    return created_cohorts
+    return created_trades
 
 
 def seed_payments(session, companies):
-    """Seed payments table with sample data"""
-    logger.info("Seeding payments")
+    """Seed payments table with sample data - extensive multi-month data"""
+    logger.info("Seeding payments - generating extensive payment data")
+    
+    # Helper function to generate payment amounts with some variance
+    import random
+    random.seed(42)  # For reproducible data
+    
+    def generate_payment_amount(base_amount, variance=0.3):
+        """Generate payment amount with variance"""
+        return round(base_amount * (1 + random.uniform(-variance, variance)), 2)
     
     payments_data = [
         {
             "company_name": "Acme Corp",
             "payments": [
-                {"customer_id": "cust_001", "payment_date": date(2024, 1, 15), "cohort_month": date(2024, 1, 1), "amount": 5000.0},
-                {"customer_id": "cust_001", "payment_date": date(2024, 2, 15), "cohort_month": date(2024, 1, 1), "amount": 4500.0},
-                {"customer_id": "cust_002", "payment_date": date(2024, 1, 20), "cohort_month": date(2024, 1, 1), "amount": 8000.0},
-                {"customer_id": "cust_003", "payment_date": date(2024, 2, 10), "cohort_month": date(2024, 2, 1), "amount": 12000.0}
+                # October 2023 cohort customers
+                {"customer_id": "acme_001", "payment_date": date(2023, 10, 15), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(5000)},
+                {"customer_id": "acme_001", "payment_date": date(2023, 11, 15), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(4800)},
+                {"customer_id": "acme_001", "payment_date": date(2023, 12, 15), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(4900)},
+                {"customer_id": "acme_001", "payment_date": date(2024, 1, 15), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(5100)},
+                {"customer_id": "acme_001", "payment_date": date(2024, 2, 15), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(4700)},
+                {"customer_id": "acme_001", "payment_date": date(2024, 3, 15), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(4850)},
+                
+                {"customer_id": "acme_002", "payment_date": date(2023, 10, 20), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(7500)},
+                {"customer_id": "acme_002", "payment_date": date(2023, 11, 20), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(7200)},
+                {"customer_id": "acme_002", "payment_date": date(2023, 12, 20), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(7800)},
+                {"customer_id": "acme_002", "payment_date": date(2024, 1, 20), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(7600)},
+                {"customer_id": "acme_002", "payment_date": date(2024, 2, 20), "cohort_month": date(2023, 10, 1), "amount": generate_payment_amount(7400)},
+                
+                # November 2023 cohort customers
+                {"customer_id": "acme_003", "payment_date": date(2023, 11, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(6000)},
+                {"customer_id": "acme_003", "payment_date": date(2023, 12, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(5800)},
+                {"customer_id": "acme_003", "payment_date": date(2024, 1, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(6200)},
+                {"customer_id": "acme_003", "payment_date": date(2024, 2, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(5900)},
+                {"customer_id": "acme_003", "payment_date": date(2024, 3, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(6100)},
+                
+                {"customer_id": "acme_004", "payment_date": date(2023, 11, 25), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(4200)},
+                {"customer_id": "acme_004", "payment_date": date(2023, 12, 25), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(4000)},
+                {"customer_id": "acme_004", "payment_date": date(2024, 1, 25), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(4300)},
+                {"customer_id": "acme_004", "payment_date": date(2024, 2, 25), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(4100)},
+                
+                # December 2023 cohort customers
+                {"customer_id": "acme_005", "payment_date": date(2023, 12, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8500)},
+                {"customer_id": "acme_005", "payment_date": date(2024, 1, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8200)},
+                {"customer_id": "acme_005", "payment_date": date(2024, 2, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8800)},
+                {"customer_id": "acme_005", "payment_date": date(2024, 3, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8400)},
+                {"customer_id": "acme_005", "payment_date": date(2024, 4, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8600)},
+                
+                # January 2024 cohort customers
+                {"customer_id": "acme_006", "payment_date": date(2024, 1, 15), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(5000)},
+                {"customer_id": "acme_006", "payment_date": date(2024, 2, 15), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(4800)},
+                {"customer_id": "acme_006", "payment_date": date(2024, 3, 15), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(5200)},
+                {"customer_id": "acme_006", "payment_date": date(2024, 4, 15), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(4900)},
+                
+                {"customer_id": "acme_007", "payment_date": date(2024, 1, 20), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(7000)},
+                {"customer_id": "acme_007", "payment_date": date(2024, 2, 20), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(6800)},
+                {"customer_id": "acme_007", "payment_date": date(2024, 3, 20), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(7200)},
+                
+                # February 2024 cohort customers
+                {"customer_id": "acme_008", "payment_date": date(2024, 2, 10), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(9500)},
+                {"customer_id": "acme_008", "payment_date": date(2024, 3, 10), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(9200)},
+                {"customer_id": "acme_008", "payment_date": date(2024, 4, 10), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(9800)},
+                
+                {"customer_id": "acme_009", "payment_date": date(2024, 2, 25), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(6500)},
+                {"customer_id": "acme_009", "payment_date": date(2024, 3, 25), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(6300)},
+                {"customer_id": "acme_009", "payment_date": date(2024, 4, 25), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(6700)},
+                
+                # March 2024 cohort customers
+                {"customer_id": "acme_010", "payment_date": date(2024, 3, 8), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(4800)},
+                {"customer_id": "acme_010", "payment_date": date(2024, 4, 8), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(4600)},
+                {"customer_id": "acme_010", "payment_date": date(2024, 5, 8), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(4900)},
             ]
         },
         {
             "company_name": "TechStart Inc",
             "payments": [
-                {"customer_id": "tech_001", "payment_date": date(2024, 1, 10), "cohort_month": date(2024, 1, 1), "amount": 3000.0}
+                # November 2023 cohort
+                {"customer_id": "tech_001", "payment_date": date(2023, 11, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(3500)},
+                {"customer_id": "tech_001", "payment_date": date(2023, 12, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(3300)},
+                {"customer_id": "tech_001", "payment_date": date(2024, 1, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(3600)},
+                {"customer_id": "tech_001", "payment_date": date(2024, 2, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(3400)},
+                {"customer_id": "tech_001", "payment_date": date(2024, 3, 10), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(3550)},
+                
+                {"customer_id": "tech_002", "payment_date": date(2023, 11, 15), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(2800)},
+                {"customer_id": "tech_002", "payment_date": date(2023, 12, 15), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(2600)},
+                {"customer_id": "tech_002", "payment_date": date(2024, 1, 15), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(2900)},
+                {"customer_id": "tech_002", "payment_date": date(2024, 2, 15), "cohort_month": date(2023, 11, 1), "amount": generate_payment_amount(2750)},
+                
+                # December 2023 cohort
+                {"customer_id": "tech_003", "payment_date": date(2023, 12, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(4200)},
+                {"customer_id": "tech_003", "payment_date": date(2024, 1, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(4000)},
+                {"customer_id": "tech_003", "payment_date": date(2024, 2, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(4400)},
+                {"customer_id": "tech_003", "payment_date": date(2024, 3, 5), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(4100)},
+                
+                # January 2024 cohort  
+                {"customer_id": "tech_004", "payment_date": date(2024, 1, 12), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(3000)},
+                {"customer_id": "tech_004", "payment_date": date(2024, 2, 12), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(2850)},
+                {"customer_id": "tech_004", "payment_date": date(2024, 3, 12), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(3100)},
+                {"customer_id": "tech_004", "payment_date": date(2024, 4, 12), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(2950)},
+                
+                {"customer_id": "tech_005", "payment_date": date(2024, 1, 18), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(5200)},
+                {"customer_id": "tech_005", "payment_date": date(2024, 2, 18), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(5000)},
+                {"customer_id": "tech_005", "payment_date": date(2024, 3, 18), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(5400)},
+                
+                # February 2024 cohort
+                {"customer_id": "tech_006", "payment_date": date(2024, 2, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(3800)},
+                {"customer_id": "tech_006", "payment_date": date(2024, 3, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(3600)},
+                {"customer_id": "tech_006", "payment_date": date(2024, 4, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(3900)},
+                
+                # March 2024 cohort
+                {"customer_id": "tech_007", "payment_date": date(2024, 3, 15), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(4500)},
+                {"customer_id": "tech_007", "payment_date": date(2024, 4, 15), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(4300)},
+                {"customer_id": "tech_007", "payment_date": date(2024, 5, 15), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(4700)},
+                
+                {"customer_id": "tech_008", "payment_date": date(2024, 3, 22), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(2900)},
+                {"customer_id": "tech_008", "payment_date": date(2024, 4, 22), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(2750)},
             ]
         },
         {
             "company_name": "GrowthCo",
             "payments": [
-                {"customer_id": "growth_001", "payment_date": date(2024, 2, 12), "cohort_month": date(2024, 2, 1), "amount": 25000.0}
+                # December 2023 cohort
+                {"customer_id": "growth_001", "payment_date": date(2023, 12, 12), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(15000)},
+                {"customer_id": "growth_001", "payment_date": date(2024, 1, 12), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(14500)},
+                {"customer_id": "growth_001", "payment_date": date(2024, 2, 12), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(15500)},
+                {"customer_id": "growth_001", "payment_date": date(2024, 3, 12), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(14800)},
+                {"customer_id": "growth_001", "payment_date": date(2024, 4, 12), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(15200)},
+                
+                {"customer_id": "growth_002", "payment_date": date(2023, 12, 18), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(22000)},
+                {"customer_id": "growth_002", "payment_date": date(2024, 1, 18), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(21500)},
+                {"customer_id": "growth_002", "payment_date": date(2024, 2, 18), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(22800)},
+                {"customer_id": "growth_002", "payment_date": date(2024, 3, 18), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(22200)},
+                
+                # January 2024 cohort  
+                {"customer_id": "growth_003", "payment_date": date(2024, 1, 8), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(18000)},
+                {"customer_id": "growth_003", "payment_date": date(2024, 2, 8), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(17500)},
+                {"customer_id": "growth_003", "payment_date": date(2024, 3, 8), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(18500)},
+                {"customer_id": "growth_003", "payment_date": date(2024, 4, 8), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(18200)},
+                
+                {"customer_id": "growth_004", "payment_date": date(2024, 1, 25), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(28000)},
+                {"customer_id": "growth_004", "payment_date": date(2024, 2, 25), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(27200)},
+                {"customer_id": "growth_004", "payment_date": date(2024, 3, 25), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(28800)},
+                
+                # February 2024 cohort
+                {"customer_id": "growth_005", "payment_date": date(2024, 2, 12), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(25000)},
+                {"customer_id": "growth_005", "payment_date": date(2024, 3, 12), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(24500)},
+                {"customer_id": "growth_005", "payment_date": date(2024, 4, 12), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(25800)},
+                
+                {"customer_id": "growth_006", "payment_date": date(2024, 2, 20), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(19500)},
+                {"customer_id": "growth_006", "payment_date": date(2024, 3, 20), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(19000)},
+                {"customer_id": "growth_006", "payment_date": date(2024, 4, 20), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(20000)},
+                
+                # March 2024 cohort
+                {"customer_id": "growth_007", "payment_date": date(2024, 3, 10), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(32000)},
+                {"customer_id": "growth_007", "payment_date": date(2024, 4, 10), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(31500)},
+                {"customer_id": "growth_007", "payment_date": date(2024, 5, 10), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(33000)},
+                
+                {"customer_id": "growth_008", "payment_date": date(2024, 3, 28), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(16500)},
+                {"customer_id": "growth_008", "payment_date": date(2024, 4, 28), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(16200)},
+            ]
+        },
+        {
+            "company_name": "DataDriven Solutions",
+            "payments": [
+                # January 2024 cohort
+                {"customer_id": "data_001", "payment_date": date(2024, 1, 12), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(4500)},
+                {"customer_id": "data_001", "payment_date": date(2024, 2, 12), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(4300)},
+                {"customer_id": "data_001", "payment_date": date(2024, 3, 12), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(4700)},
+                {"customer_id": "data_001", "payment_date": date(2024, 4, 12), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(4400)},
+                
+                {"customer_id": "data_002", "payment_date": date(2024, 1, 20), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(6200)},
+                {"customer_id": "data_002", "payment_date": date(2024, 2, 20), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(6000)},
+                {"customer_id": "data_002", "payment_date": date(2024, 3, 20), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(6400)},
+                
+                # February 2024 cohort
+                {"customer_id": "data_003", "payment_date": date(2024, 2, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(5800)},
+                {"customer_id": "data_003", "payment_date": date(2024, 3, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(5600)},
+                {"customer_id": "data_003", "payment_date": date(2024, 4, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(5950)},
+                
+                {"customer_id": "data_004", "payment_date": date(2024, 2, 15), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(3900)},
+                {"customer_id": "data_004", "payment_date": date(2024, 3, 15), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(3750)},
+                {"customer_id": "data_004", "payment_date": date(2024, 4, 15), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(4000)},
+                
+                # March 2024 cohort
+                {"customer_id": "data_005", "payment_date": date(2024, 3, 10), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(5200)},
+                {"customer_id": "data_005", "payment_date": date(2024, 4, 10), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(5000)},
+                {"customer_id": "data_005", "payment_date": date(2024, 5, 10), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(5400)},
+                
+                # April 2024 cohort
+                {"customer_id": "data_006", "payment_date": date(2024, 4, 5), "cohort_month": date(2024, 4, 1), "amount": generate_payment_amount(7500)},
+                {"customer_id": "data_006", "payment_date": date(2024, 5, 5), "cohort_month": date(2024, 4, 1), "amount": generate_payment_amount(7300)},
+                
+                {"customer_id": "data_007", "payment_date": date(2024, 4, 18), "cohort_month": date(2024, 4, 1), "amount": generate_payment_amount(4800)},
+                {"customer_id": "data_007", "payment_date": date(2024, 5, 18), "cohort_month": date(2024, 4, 1), "amount": generate_payment_amount(4600)},
+            ]
+        },
+        {
+            "company_name": "CloudFirst Technologies",
+            "payments": [
+                # December 2023 cohort
+                {"customer_id": "cloud_001", "payment_date": date(2023, 12, 10), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8500)},
+                {"customer_id": "cloud_001", "payment_date": date(2024, 1, 10), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8200)},
+                {"customer_id": "cloud_001", "payment_date": date(2024, 2, 10), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8800)},
+                {"customer_id": "cloud_001", "payment_date": date(2024, 3, 10), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8400)},
+                {"customer_id": "cloud_001", "payment_date": date(2024, 4, 10), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(8600)},
+                
+                {"customer_id": "cloud_002", "payment_date": date(2023, 12, 25), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(12000)},
+                {"customer_id": "cloud_002", "payment_date": date(2024, 1, 25), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(11700)},
+                {"customer_id": "cloud_002", "payment_date": date(2024, 2, 25), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(12300)},
+                {"customer_id": "cloud_002", "payment_date": date(2024, 3, 25), "cohort_month": date(2023, 12, 1), "amount": generate_payment_amount(12100)},
+                
+                # January 2024 cohort
+                {"customer_id": "cloud_003", "payment_date": date(2024, 1, 15), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(9800)},
+                {"customer_id": "cloud_003", "payment_date": date(2024, 2, 15), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(9500)},
+                {"customer_id": "cloud_003", "payment_date": date(2024, 3, 15), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(10100)},
+                {"customer_id": "cloud_003", "payment_date": date(2024, 4, 15), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(9750)},
+                
+                {"customer_id": "cloud_004", "payment_date": date(2024, 1, 22), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(14500)},
+                {"customer_id": "cloud_004", "payment_date": date(2024, 2, 22), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(14200)},
+                {"customer_id": "cloud_004", "payment_date": date(2024, 3, 22), "cohort_month": date(2024, 1, 1), "amount": generate_payment_amount(14800)},
+                
+                # February 2024 cohort
+                {"customer_id": "cloud_005", "payment_date": date(2024, 2, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(7800)},
+                {"customer_id": "cloud_005", "payment_date": date(2024, 3, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(7600)},
+                {"customer_id": "cloud_005", "payment_date": date(2024, 4, 8), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(8000)},
+                
+                {"customer_id": "cloud_006", "payment_date": date(2024, 2, 20), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(11200)},
+                {"customer_id": "cloud_006", "payment_date": date(2024, 3, 20), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(10900)},
+                {"customer_id": "cloud_006", "payment_date": date(2024, 4, 20), "cohort_month": date(2024, 2, 1), "amount": generate_payment_amount(11500)},
+                
+                # March 2024 cohort
+                {"customer_id": "cloud_007", "payment_date": date(2024, 3, 12), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(13500)},
+                {"customer_id": "cloud_007", "payment_date": date(2024, 4, 12), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(13200)},
+                {"customer_id": "cloud_007", "payment_date": date(2024, 5, 12), "cohort_month": date(2024, 3, 1), "amount": generate_payment_amount(13800)},
             ]
         }
     ]
@@ -221,19 +486,84 @@ def seed_thresholds(session, companies):
             "company_name": "Acme Corp",
             "thresholds": [
                 {"payment_period_month": 0, "minimum_payment_percent": 0.15},
-                {"payment_period_month": 1, "minimum_payment_percent": 0.10}
+                {"payment_period_month": 1, "minimum_payment_percent": 0.10},
+                {"payment_period_month": 3, "minimum_payment_percent": 0.25},
+                {"payment_period_month": 6, "minimum_payment_percent": 0.45}
             ]
         },
         {
             "company_name": "TechStart Inc",
             "thresholds": [
-                {"payment_period_month": 0, "minimum_payment_percent": 0.20}
+                {"payment_period_month": 0, "minimum_payment_percent": 0.20},
+                {"payment_period_month": 2, "minimum_payment_percent": 0.30},
+                {"payment_period_month": 4, "minimum_payment_percent": 0.50}
             ]
         },
         {
             "company_name": "GrowthCo",
             "thresholds": [
-                {"payment_period_month": 1, "minimum_payment_percent": 0.12}
+                {"payment_period_month": 1, "minimum_payment_percent": 0.12},
+                {"payment_period_month": 3, "minimum_payment_percent": 0.28},
+                {"payment_period_month": 6, "minimum_payment_percent": 0.55},
+                {"payment_period_month": 12, "minimum_payment_percent": 0.75}
+            ]
+        },
+        {
+            "company_name": "DataDriven Solutions",
+            "thresholds": [
+                {"payment_period_month": 0, "minimum_payment_percent": 0.18},
+                {"payment_period_month": 2, "minimum_payment_percent": 0.35},
+                {"payment_period_month": 6, "minimum_payment_percent": 0.60}
+            ]
+        },
+        {
+            "company_name": "CloudFirst Technologies",
+            "thresholds": [
+                {"payment_period_month": 1, "minimum_payment_percent": 0.14},
+                {"payment_period_month": 3, "minimum_payment_percent": 0.32},
+                {"payment_period_month": 9, "minimum_payment_percent": 0.70}
+            ]
+        },
+        {
+            "company_name": "AI Innovations Ltd",
+            "thresholds": [
+                {"payment_period_month": 0, "minimum_payment_percent": 0.22},
+                {"payment_period_month": 3, "minimum_payment_percent": 0.40},
+                {"payment_period_month": 6, "minimum_payment_percent": 0.65}
+            ]
+        },
+        {
+            "company_name": "ScaleUp Ventures",
+            "thresholds": [
+                {"payment_period_month": 1, "minimum_payment_percent": 0.16},
+                {"payment_period_month": 4, "minimum_payment_percent": 0.42},
+                {"payment_period_month": 8, "minimum_payment_percent": 0.68}
+            ]
+        },
+        {
+            "company_name": "FinTech Masters",
+            "thresholds": [
+                {"payment_period_month": 0, "minimum_payment_percent": 0.10},
+                {"payment_period_month": 2, "minimum_payment_percent": 0.25},
+                {"payment_period_month": 6, "minimum_payment_percent": 0.50},
+                {"payment_period_month": 12, "minimum_payment_percent": 0.80}
+            ]
+        },
+        {
+            "company_name": "EcoTech Green",
+            "thresholds": [
+                {"payment_period_month": 1, "minimum_payment_percent": 0.20},
+                {"payment_period_month": 3, "minimum_payment_percent": 0.38},
+                {"payment_period_month": 6, "minimum_payment_percent": 0.58}
+            ]
+        },
+        {
+            "company_name": "HealthTech Plus",
+            "thresholds": [
+                {"payment_period_month": 0, "minimum_payment_percent": 0.12},
+                {"payment_period_month": 3, "minimum_payment_percent": 0.30},
+                {"payment_period_month": 9, "minimum_payment_percent": 0.65},
+                {"payment_period_month": 18, "minimum_payment_percent": 0.85}
             ]
         }
     ]
@@ -272,6 +602,118 @@ def seed_thresholds(session, companies):
     logger.info("Created thresholds", total_created=thresholds_created)
 
 
+def seed_spends(session, companies):
+    """Seed spends table with comprehensive monthly coverage for ALL companies"""
+    logger.info("Seeding spends - generating comprehensive monthly spend data")
+    
+    # Import random for reproducible variance in spend amounts
+    import random
+    from datetime import date
+    random.seed(42)  # For reproducible data
+    
+    def generate_spend_amount(base_amount, variance=0.2):
+        """Generate spend amount with variance"""
+        return round(base_amount * (1 + random.uniform(-variance, variance)), 2)
+    
+    # ALL months from Oct 2023 to May 2024 - comprehensive coverage
+    all_cohort_months = [
+        date(2023, 10, 1),
+        date(2023, 11, 1),
+        date(2023, 12, 1),
+        date(2024, 1, 1),
+        date(2024, 2, 1),
+        date(2024, 3, 1),
+        date(2024, 4, 1),
+        date(2024, 5, 1)
+    ]
+    
+    # Company spend profiles with realistic base amounts (monthly spend budgets)
+    company_spend_profiles = {
+        "Acme Corp": {"base_spend": 180000, "variance": 0.15},
+        "TechStart Inc": {"base_spend": 85000, "variance": 0.25},
+        "GrowthCo": {"base_spend": 320000, "variance": 0.18},
+        "DataDriven Solutions": {"base_spend": 140000, "variance": 0.22},
+        "CloudFirst Technologies": {"base_spend": 230000, "variance": 0.20},
+        "AI Innovations Ltd": {"base_spend": 195000, "variance": 0.24},
+        "ScaleUp Ventures": {"base_spend": 115000, "variance": 0.28},
+        "FinTech Masters": {"base_spend": 290000, "variance": 0.16},
+        "EcoTech Green": {"base_spend": 105000, "variance": 0.30},
+        "HealthTech Plus": {"base_spend": 210000, "variance": 0.19},
+        "EdTech Revolution": {"base_spend": 95000, "variance": 0.26},
+        "RetailTech Pro": {"base_spend": 165000, "variance": 0.21},
+        "SecurityFirst Systems": {"base_spend": 175000, "variance": 0.23},
+        "MediaStream Networks": {"base_spend": 155000, "variance": 0.25},
+        "LogisticsPro Solutions": {"base_spend": 135000, "variance": 0.24}
+    }
+    
+    spends_created = 0
+    
+    # Generate spend data for ALL companies and ALL months
+    for company_name, company in companies.items():
+        spend_profile = company_spend_profiles.get(company_name, {"base_spend": 150000, "variance": 0.2})
+        
+        logger.info("Creating spend data for company", 
+                   company=company_name, 
+                   base_spend=spend_profile["base_spend"],
+                   total_months=len(all_cohort_months))
+        
+        for cohort_month in all_cohort_months:
+            # Check if spend already exists
+            existing = session.query(Spend).filter_by(
+                company_id=company.id,
+                cohort_month=cohort_month
+            ).first()
+            
+            if existing:
+                logger.debug("Spend already exists",
+                           company=company_name,
+                           cohort_month=cohort_month)
+                continue
+            
+            # Generate spend amount with variance
+            spend_amount = generate_spend_amount(
+                spend_profile["base_spend"], 
+                spend_profile["variance"]
+            )
+            
+            spend = Spend(
+                company_id=company.id,
+                cohort_month=cohort_month,
+                spend=spend_amount,
+                created_at=datetime.utcnow()
+            )
+            session.add(spend)
+            spends_created += 1
+            
+            logger.debug("Created spend entry",
+                        company=company_name,
+                        cohort_month=cohort_month,
+                        spend_amount=spend_amount)
+    
+    logger.info("Created spends", 
+               total_created=spends_created,
+               expected_total=len(companies) * len(all_cohort_months),
+               companies=len(companies),
+               months=len(all_cohort_months))
+    
+    # Verification: ensure we have complete coverage
+    session.flush()  # Ensure data is available for querying
+    
+    for company_name, company in companies.items():
+        spend_count = session.query(Spend).filter_by(company_id=company.id).count()
+        expected_count = len(all_cohort_months)
+        
+        if spend_count != expected_count:
+            logger.warning("Incomplete spend coverage",
+                          company=company_name,
+                          actual_count=spend_count,
+                          expected_count=expected_count)
+        else:
+            logger.debug("Complete spend coverage verified",
+                        company=company_name,
+                        spend_count=spend_count)
+
+
 def seed_database(force_recreate=False):
     """
     Main seeding function that populates the database with sample data
@@ -287,19 +729,20 @@ def seed_database(force_recreate=False):
         if force_recreate:
             logger.warning("Force recreate enabled - clearing existing data")
             # Delete in reverse dependency order
-            session.query(CashflowSnapshot).delete()
+            session.query(Spend).delete()
             session.query(Threshold).delete()
             session.query(Payment).delete()
-            session.query(Cohort).delete()
+            session.query(Trade).delete()
             session.query(Company).delete()
             session.commit()
             logger.info("Cleared existing data")
         
         # Seed data in dependency order
         companies = seed_companies(session)
-        cohorts = seed_cohorts(session, companies)
+        trades = seed_trades(session, companies)
         seed_payments(session, companies)
         seed_thresholds(session, companies)
+        seed_spends(session, companies)
         
         # Commit all changes
         session.commit()
@@ -307,15 +750,17 @@ def seed_database(force_recreate=False):
         
         # Log summary
         company_count = session.query(Company).count()
-        cohort_count = session.query(Cohort).count()
+        trade_count = session.query(Trade).count()
         payment_count = session.query(Payment).count()
         threshold_count = session.query(Threshold).count()
+        spend_count = session.query(Spend).count()
         
         logger.info("Seeding summary",
                    companies=company_count,
-                   cohorts=cohort_count,
+                   trades=trade_count,
                    payments=payment_count,
-                   thresholds=threshold_count)
+                   thresholds=threshold_count,
+                   spends=spend_count)
         
     except Exception as e:
         logger.error("Error during database seeding", error=str(e))
