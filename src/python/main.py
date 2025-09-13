@@ -189,9 +189,6 @@ async def list_payments(company_id: int, db_ops: DatabaseOperations = Depends(ge
     return [PaymentResponse.from_db(payment) for payment in db_payments]
 
 
-# Trade endpoints removed - trading terms moved to cohort endpoints
-
-
 # Threshold endpoints
 @app.post("/companies/{company_id}/thresholds/", response_model=ThresholdResponse)
 async def create_threshold(
