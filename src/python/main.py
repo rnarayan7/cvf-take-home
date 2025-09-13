@@ -9,11 +9,14 @@ from src.python.utils.calc import payment_df_to_cohort_df, get_cvf_cashflows_df
 from src.python.models.models import (
     CompanyCreate,
     CompanyResponse,
-    CohortCreate,
-    CohortResponse,
+    TradeCreate,
+    TradeResponse,
     PaymentResponse,
     ThresholdCreate,
     ThresholdResponse,
+    SpendCreate,
+    SpendUpdate,
+    SpendResponse,
     MetricsResponse,
 )
 from src.python.utils.csv_processor import get_payments_csv_processor
@@ -30,17 +33,19 @@ app = FastAPI(
     
     ### Features:
     * **Companies**: Manage portfolio companies
-    * **Cohorts**: Track sales & marketing spend plans by month
+    * **Trades**: Track trading terms by cohort month
     * **Payments**: Upload and manage customer payment data
+    * **Spends**: Manage spending data by company and cohort month (company-scoped)
     * **Analytics**: Calculate metrics like MOIC, LTV, CAC
     * **Cashflows**: View projected cashflows with trading terms
     * **Thresholds**: Set minimum payment thresholds
     
     ### Getting Started:
     1. Create a company using `POST /companies/`
-    2. Add cohorts (spend plans) using `POST /companies/{id}/cohorts/`
-    3. Upload payment data using `POST /companies/{id}/payments/upload`
-    4. View analytics at `GET /companies/{id}/metrics`
+    2. Add trades (trading terms) using `POST /companies/{id}/trades/`
+    3. Add spend data using `POST /companies/{id}/spends/`
+    4. Upload payment data using `POST /companies/{id}/payments/upload`
+    5. View analytics at `GET /companies/{id}/metrics`
     """,
     version="1.0.0",
     contact={
@@ -116,47 +121,47 @@ async def get_company(company_id: int, db_ops: DatabaseOperations = Depends(get_
     return CompanyResponse.from_db(company)
 
 
-# Spend/Cohort endpoints
-@app.post("/companies/{company_id}/cohorts/", response_model=CohortResponse, tags=["Cohorts"])
-async def create_cohort(company_id: int, cohort: CohortCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
-    """Create a new cohort (S&M spend plan) for a company"""
+# Trade endpoints
+@app.post("/companies/{company_id}/trades/", response_model=TradeResponse, tags=["Trades"])
+async def create_trade(company_id: int, trade: TradeCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
+    """Create a new trade (trading terms) for a company cohort"""
     logger.info(
-        "Creating cohort", company_id=company_id, cohort_month=cohort.cohort_month, planned_sm=cohort.planned_sm
+        "Creating trade", company_id=company_id, cohort_month=trade.cohort_month
     )
 
     # Validate company exists
     if not db_ops.companies.company_exists(company_id):
-        logger.warning("Company not found for cohort creation", company_id=company_id)
+        logger.warning("Company not found for trade creation", company_id=company_id)
         raise HTTPException(status_code=404, detail="Company not found")
 
-    # Check if cohort already exists for this month
-    existing = db_ops.cohorts.get_cohort(company_id, cohort.cohort_month)
+    # Check if trade already exists for this month
+    existing = db_ops.trades.get_trade(company_id, trade.cohort_month)
     if existing:
-        logger.warning("Cohort already exists", company_id=company_id, cohort_month=cohort.cohort_month)
-        raise HTTPException(status_code=400, detail="Cohort for this month already exists")
+        logger.warning("Trade already exists", company_id=company_id, cohort_month=trade.cohort_month)
+        raise HTTPException(status_code=400, detail="Trade for this month already exists")
 
     try:
-        db_cohort = db_ops.cohorts.create_cohort(
-            company_id, cohort.cohort_month, cohort.planned_sm, cohort.sharing_percentage, cohort.cash_cap
+        db_trade = db_ops.trades.create_trade(
+            company_id, trade.cohort_month, trade.sharing_percentage, trade.cash_cap
         )
-        return CohortResponse.from_db(db_cohort)
+        return TradeResponse.from_db(db_trade)
     except Exception as e:
-        logger.error("Failed to create cohort", company_id=company_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to create cohort")
+        logger.error("Failed to create trade", company_id=company_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to create trade")
 
 
-@app.get("/companies/{company_id}/cohorts/", response_model=List[CohortResponse], tags=["Cohorts"])
-async def list_cohorts(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
-    """List all cohorts for a company"""
-    logger.info("Listing cohorts", company_id=company_id)
+@app.get("/companies/{company_id}/trades/", response_model=List[TradeResponse], tags=["Trades"])
+async def list_trades(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
+    """List all trades for a company"""
+    logger.info("Listing trades", company_id=company_id)
 
     # Validate company exists
     if not db_ops.companies.company_exists(company_id):
-        logger.warning("Company not found for cohort listing", company_id=company_id)
+        logger.warning("Company not found for trade listing", company_id=company_id)
         raise HTTPException(status_code=404, detail="Company not found")
 
-    db_cohorts = db_ops.cohorts.list_cohorts_by_company(company_id)
-    return [CohortResponse.from_db(cohort) for cohort in db_cohorts]
+    db_trades = db_ops.trades.list_trades_by_company(company_id)
+    return [TradeResponse.from_db(trade) for trade in db_trades]
 
 
 # Payment endpoints
@@ -190,7 +195,7 @@ async def list_payments(company_id: int, db_ops: DatabaseOperations = Depends(ge
 
 
 # Threshold endpoints
-@app.post("/companies/{company_id}/thresholds/", response_model=ThresholdResponse)
+@app.post("/companies/{company_id}/thresholds/", response_model=ThresholdResponse, tags = ["Thresholds"])
 async def create_threshold(
     company_id: int, threshold: ThresholdCreate, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
@@ -200,7 +205,7 @@ async def create_threshold(
     return ThresholdResponse.from_db(db_threshold)
 
 
-@app.get("/companies/{company_id}/thresholds/", response_model=List[ThresholdResponse])
+@app.get("/companies/{company_id}/thresholds/", response_model=List[ThresholdResponse], tags = ["Thresholds"])
 async def list_thresholds(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
     db_thresholds = db_ops.thresholds.list_thresholds_by_company(company_id)
     return [ThresholdResponse.from_db(threshold) for threshold in db_thresholds]
@@ -313,7 +318,7 @@ async def get_cohorts_table(
                 {"cohort_month": cohort_month.strftime("%Y-%m"), "actual": actual_values, "predicted": predicted_values}
             )
 
-        logger.info("Cohorts table generated", company_id=company_id, cohort_count=len(rows), period_count=len(columns))
+        logger.info("Cohort table generated", company_id=company_id, cohort_count=len(rows), period_count=len(columns))
 
         return {"columns": columns, "rows": rows}
 
@@ -495,3 +500,249 @@ async def get_company_stats(company_id: int, db_ops: DatabaseOperations = Depend
     except Exception as e:
         logger.error("Failed to generate stats", company_id=company_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to generate statistics")
+
+
+# Spend endpoints - All operations are scoped to companies
+
+
+
+
+
+
+
+
+
+
+@app.get("/companies/{company_id}/spends/", response_model=List[SpendResponse], tags=["Spends"])
+async def list_company_spends(
+    company_id: int,
+    cohort_month: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+    include_company: bool = False,
+    db_ops: DatabaseOperations = Depends(get_db_operations)
+):
+    """Get all spend records for a specific company"""
+    logger.info(
+        "Listing company spends", 
+        company_id=company_id, 
+        cohort_month=cohort_month,
+        limit=limit,
+        offset=offset,
+        include_company=include_company
+    )
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for spend listing", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Parse cohort_month if provided
+        cohort_date = None
+        if cohort_month:
+            try:
+                cohort_date = datetime.strptime(cohort_month, "%Y-%m").date()
+            except ValueError:
+                logger.warning("Invalid cohort_month format", cohort_month=cohort_month)
+                raise HTTPException(status_code=400, detail="Invalid cohort_month format. Use YYYY-MM")
+
+        # Get spends for the company
+        db_spends = db_ops.spends.list_spends_by_company(
+            company_id=company_id,
+            cohort_month=cohort_date,
+            limit=limit,
+            offset=offset
+        )
+
+        # Convert to response models
+        response_spends = []
+        for spend in db_spends:
+            if include_company:
+                # Load company relationship if requested
+                from sqlalchemy.orm import joinedload
+                from src.python.db.schemas import Spend
+                spend_with_company = (db_ops.db.query(Spend)
+                    .options(joinedload("company"))
+                    .filter(Spend.id == spend.id)).first()
+                response_spends.append(SpendResponse.from_db(spend_with_company, include_company=True))
+            else:
+                response_spends.append(SpendResponse.from_db(spend, include_company=False))
+
+        logger.info("Company spends listed", company_id=company_id, count=len(response_spends))
+        return response_spends
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to list company spends", company_id=company_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to list company spends")
+
+
+@app.post("/companies/{company_id}/spends/", response_model=SpendResponse, tags=["Spends"])
+async def create_company_spend(
+    company_id: int,
+    spend: SpendCreate, 
+    db_ops: DatabaseOperations = Depends(get_db_operations)
+):
+    """Create a new spend record for a specific company"""
+    logger.info(
+        "Creating company spend", 
+        company_id=company_id, 
+        cohort_month=spend.cohort_month, 
+        spend_amount=spend.spend
+    )
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for spend creation", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Check if spend already exists for this company and cohort month
+        existing = db_ops.spends.get_spend_by_company_and_cohort(company_id, spend.cohort_month)
+        if existing:
+            logger.warning(
+                "Spend already exists", 
+                company_id=company_id, 
+                cohort_month=spend.cohort_month
+            )
+            raise HTTPException(
+                status_code=400, 
+                detail="Spend for this company and cohort month already exists"
+            )
+
+        # Validate spend amount is positive
+        if spend.spend <= 0:
+            logger.warning("Invalid spend amount", spend_amount=spend.spend)
+            raise HTTPException(status_code=400, detail="Spend amount must be positive")
+
+        # Create spend
+        db_spend = db_ops.spends.create_spend(
+            company_id=company_id,
+            cohort_month=spend.cohort_month,
+            spend=spend.spend
+        )
+
+        return SpendResponse.from_db(db_spend)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to create company spend", company_id=company_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to create spend")
+
+
+@app.get("/companies/{company_id}/spends/{spend_id}", response_model=SpendResponse, tags=["Spends"])
+async def get_company_spend(
+    company_id: int,
+    spend_id: int, 
+    include_company: bool = False,
+    db_ops: DatabaseOperations = Depends(get_db_operations)
+):
+    """Get specific spend by ID for a specific company"""
+    logger.info("Getting company spend", company_id=company_id, spend_id=spend_id, include_company=include_company)
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for spend retrieval", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Get spend with optional company relationship
+        if include_company:
+            from sqlalchemy.orm import joinedload
+            from src.python.db.schemas import Spend
+            spend = (db_ops.db.query(Spend)
+                    .options(joinedload("company"))
+                    .filter(Spend.id == spend_id, Spend.company_id == company_id).first())
+        else:
+            spend = db_ops.spends.get_spend_by_id(spend_id)
+
+        if not spend:
+            logger.warning("Spend not found", company_id=company_id, spend_id=spend_id)
+            raise HTTPException(status_code=404, detail="Spend not found")
+
+        # Validate spend belongs to the company
+        if spend.company_id != company_id:
+            logger.warning("Spend does not belong to company", company_id=company_id, spend_id=spend_id, spend_company_id=spend.company_id)
+            raise HTTPException(status_code=404, detail="Spend not found")
+
+        return SpendResponse.from_db(spend, include_company=include_company)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get company spend", company_id=company_id, spend_id=spend_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get spend")
+
+
+@app.put("/companies/{company_id}/spends/{spend_id}", response_model=SpendResponse, tags=["Spends"])
+async def update_company_spend(
+    company_id: int,
+    spend_id: int,
+    spend_update: SpendUpdate,
+    db_ops: DatabaseOperations = Depends(get_db_operations)
+):
+    """Update an existing spend record for a specific company"""
+    logger.info("Updating company spend", company_id=company_id, spend_id=spend_id)
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for spend update", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Check if spend exists and belongs to the company
+        existing_spend = db_ops.spends.get_spend_by_id(spend_id)
+        if not existing_spend:
+            logger.warning("Spend not found for update", company_id=company_id, spend_id=spend_id)
+            raise HTTPException(status_code=404, detail="Spend not found")
+
+        if existing_spend.company_id != company_id:
+            logger.warning("Spend does not belong to company", company_id=company_id, spend_id=spend_id, spend_company_id=existing_spend.company_id)
+            raise HTTPException(status_code=404, detail="Spend not found")
+
+        # Prevent changing company_id in company-scoped endpoint
+        if spend_update.company_id is not None and spend_update.company_id != company_id:
+            logger.warning("Cannot change company_id in company-scoped endpoint", company_id=company_id, new_company_id=spend_update.company_id)
+            raise HTTPException(status_code=400, detail="Cannot change company_id for spend in company-scoped endpoint")
+
+        # Check for duplicate if cohort_month is being updated
+        if spend_update.cohort_month is not None:
+            existing_duplicate = db_ops.spends.get_spend_by_company_and_cohort(company_id, spend_update.cohort_month)
+            if existing_duplicate and existing_duplicate.id != spend_id:
+                logger.warning(
+                    "Spend already exists for updated cohort month",
+                    company_id=company_id,
+                    cohort_month=spend_update.cohort_month
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail="Spend for this company and cohort month already exists"
+                )
+
+        # Validate spend amount is positive if being updated
+        if spend_update.spend is not None and spend_update.spend <= 0:
+            logger.warning("Invalid spend amount", spend_amount=spend_update.spend)
+            raise HTTPException(status_code=400, detail="Spend amount must be positive")
+
+        # Update spend (don't allow company_id change in company-scoped context)
+        updated_spend = db_ops.spends.update_spend(
+            spend_id=spend_id,
+            company_id=None,  # Keep original company_id
+            cohort_month=spend_update.cohort_month,
+            spend=spend_update.spend
+        )
+
+        if not updated_spend:
+            logger.error("Failed to update company spend", company_id=company_id, spend_id=spend_id)
+            raise HTTPException(status_code=500, detail="Failed to update spend")
+
+        return SpendResponse.from_db(updated_spend)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update company spend", company_id=company_id, spend_id=spend_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to update spend")

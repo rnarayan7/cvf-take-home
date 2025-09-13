@@ -11,7 +11,7 @@ import pandas as pd
 import structlog
 from fastapi import Depends
 
-from src.python.db.schemas import Company, Cohort, Payment, Threshold
+from src.python.db.schemas import Company, Trade, Payment, Threshold, Spend
 from src.python.db.database import get_db
 
 logger = structlog.get_logger(__file__)
@@ -55,54 +55,51 @@ class CompanyOperations:
         return self.db.query(Company).filter(Company.id == company_id).first() is not None
 
 
-class CohortOperations:
-    """Database operations for Cohort model"""
+class TradeOperations:
+    """Database operations for Trade model"""
 
     def __init__(self, db: Session):
         self.db = db
 
-    def create_cohort(
+    def create_trade(
         self,
         company_id: int,
         cohort_month: date,
-        planned_sm: float,
         sharing_percentage: float = 0.5,
         cash_cap: float = 0.0,
-    ) -> Cohort:
-        """Create a new cohort with trading terms"""
+    ) -> Trade:
+        """Create a new trade with trading terms"""
         logger.info(
-            "Creating cohort",
+            "Creating trade",
             company_id=company_id,
             cohort_month=cohort_month,
-            planned_sm=planned_sm,
             sharing_percentage=sharing_percentage,
             cash_cap=cash_cap,
         )
 
-        cohort = Cohort(
+        trade = Trade(
             company_id=company_id,
             cohort_month=cohort_month,
-            planned_sm=planned_sm,
             sharing_percentage=sharing_percentage,
             cash_cap=cash_cap,
         )
-        self.db.add(cohort)
+        self.db.add(trade)
         self.db.commit()
-        self.db.refresh(cohort)
+        self.db.refresh(trade)
 
-        logger.info("Cohort created", cohort_id=cohort.id)
-        return cohort
+        logger.info("Trade created", trade_id=trade.id)
+        return trade
 
-    def list_cohorts_by_company(self, company_id: int) -> List[Cohort]:
-        """List all cohorts for a company"""
-        logger.debug("Listing cohorts", company_id=company_id)
-        return self.db.query(Cohort).filter(Cohort.company_id == company_id).all()
+    def list_trades_by_company(self, company_id: int) -> List[Trade]:
+        """List all trades for a company"""
+        logger.debug("Listing trades", company_id=company_id)
+        return self.db.query(Trade).filter(Trade.company_id == company_id).all()
 
-    def get_cohort(self, company_id: int, cohort_month: date) -> Optional[Cohort]:
-        """Get specific cohort by company and month"""
+    def get_trade(self, company_id: int, cohort_month: date) -> Optional[Trade]:
+        """Get specific trade by company and month"""
         return (
-            self.db.query(Cohort)
-            .filter(and_(Cohort.company_id == company_id, Cohort.cohort_month == cohort_month))
+            self.db.query(Trade)
+            .filter(and_(Trade.company_id == company_id, Trade.cohort_month == cohort_month))
             .first()
         )
 
@@ -225,14 +222,144 @@ class ThresholdOperations:
         return self.db.query(Threshold).filter(Threshold.company_id == company_id).all()
 
 
+class SpendOperations:
+    """Database operations for Spend model"""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_spend(self, company_id: int, cohort_month: date, spend: float) -> Spend:
+        """Create a new spend record"""
+        logger.info(
+            "Creating spend",
+            company_id=company_id,
+            cohort_month=cohort_month,
+            spend=spend,
+        )
+
+        spend_record = Spend(
+            company_id=company_id,
+            cohort_month=cohort_month,
+            spend=spend,
+        )
+        self.db.add(spend_record)
+        self.db.commit()
+        self.db.refresh(spend_record)
+
+        logger.info("Spend created", spend_id=spend_record.id)
+        return spend_record
+
+    def get_spend_by_id(self, spend_id: int) -> Optional[Spend]:
+        """Get spend by ID"""
+        logger.debug("Fetching spend", spend_id=spend_id)
+        return self.db.query(Spend).filter(Spend.id == spend_id).first()
+
+    def update_spend(self, spend_id: int, company_id: Optional[int] = None, 
+                    cohort_month: Optional[date] = None, spend: Optional[float] = None) -> Optional[Spend]:
+        """Update an existing spend record"""
+        logger.info("Updating spend", spend_id=spend_id)
+        
+        spend_record = self.get_spend_by_id(spend_id)
+        if not spend_record:
+            logger.warning("Spend not found for update", spend_id=spend_id)
+            return None
+
+        if company_id is not None:
+            spend_record.company_id = company_id
+        if cohort_month is not None:
+            spend_record.cohort_month = cohort_month
+        if spend is not None:
+            spend_record.spend = spend
+
+        self.db.commit()
+        self.db.refresh(spend_record)
+
+        logger.info("Spend updated", spend_id=spend_id)
+        return spend_record
+
+    def delete_spend(self, spend_id: int) -> bool:
+        """Delete a spend record"""
+        logger.info("Deleting spend", spend_id=spend_id)
+        
+        spend_record = self.get_spend_by_id(spend_id)
+        if not spend_record:
+            logger.warning("Spend not found for deletion", spend_id=spend_id)
+            return False
+
+        self.db.delete(spend_record)
+        self.db.commit()
+
+        logger.info("Spend deleted", spend_id=spend_id)
+        return True
+
+    def list_spends(self, company_id: Optional[int] = None, cohort_month: Optional[date] = None, 
+                   limit: Optional[int] = None, offset: Optional[int] = None) -> List[Spend]:
+        """List spends with optional filtering and pagination"""
+        logger.debug("Listing spends", company_id=company_id, cohort_month=cohort_month, limit=limit, offset=offset)
+        
+        query = self.db.query(Spend)
+        
+        if company_id is not None:
+            query = query.filter(Spend.company_id == company_id)
+        if cohort_month is not None:
+            query = query.filter(Spend.cohort_month == cohort_month)
+            
+        query = query.order_by(Spend.cohort_month.desc(), Spend.id.desc())
+        
+        if offset is not None:
+            query = query.offset(offset)
+        if limit is not None:
+            query = query.limit(limit)
+            
+        return query.all()
+
+    def list_spends_by_company(self, company_id: int, cohort_month: Optional[date] = None,
+                              limit: Optional[int] = None, offset: Optional[int] = None) -> List[Spend]:
+        """List all spends for a company with optional filtering"""
+        logger.debug("Listing spends by company", company_id=company_id, cohort_month=cohort_month)
+        return self.list_spends(company_id=company_id, cohort_month=cohort_month, limit=limit, offset=offset)
+
+    def get_spend_by_company_and_cohort(self, company_id: int, cohort_month: date) -> Optional[Spend]:
+        """Get specific spend by company and cohort month"""
+        return (
+            self.db.query(Spend)
+            .filter(and_(Spend.company_id == company_id, Spend.cohort_month == cohort_month))
+            .first()
+        )
+
+    def get_spends_dataframe(self, company_id: int) -> pd.DataFrame:
+        """Get spends as pandas DataFrame for calculations"""
+        logger.debug("Converting spends to DataFrame", company_id=company_id)
+
+        spends = self.list_spends_by_company(company_id)
+
+        if not spends:
+            logger.warning("No spends found", company_id=company_id)
+            return pd.DataFrame()
+
+        data = []
+        for spend in spends:
+            data.append(
+                {
+                    "cohort": spend.cohort_month,
+                    "spend": spend.spend,
+                }
+            )
+
+        df = pd.DataFrame(data)
+        logger.debug("DataFrame created", rows=len(df), columns=list(df.columns))
+        return df
+
+
 class AnalyticsOperations:
     """Database operations for analytics and calculations"""
 
     def __init__(self, db: Session):
         self.db = db
         self.payments = PaymentOperations(db)
-        self.cohorts = CohortOperations(db)
+        self.trades = TradeOperations(db)
         self.thresholds = ThresholdOperations(db)
+        self.spends = SpendOperations(db)
 
     def get_company_data_for_analytics(self, company_id: int) -> Dict[str, Any]:
         """Get all company data needed for analytics calculations"""
@@ -240,21 +367,21 @@ class AnalyticsOperations:
 
         # Get payments as DataFrame
         payments_df = self.payments.get_payments_dataframe(company_id)
+        
+        # Get spends as DataFrame
+        spend_df = self.spends.get_spends_dataframe(company_id)
 
-        # Get cohorts (spend data and trading terms)
-        cohorts = self.cohorts.list_cohorts_by_company(company_id)
-        spend_data = []
-        cohort_trades = []
-        for cohort in cohorts:
-            spend_data.append({"cohort": cohort.cohort_month, "spend": cohort.planned_sm})
-            cohort_trades.append(
+        # Get trades (trading terms)
+        trades = self.trades.list_trades_by_company(company_id)
+        trade_list = []
+        for trade in trades:
+            trade_list.append(
                 {
-                    "cohort_month": cohort.cohort_month.strftime("%Y-%m-%d"),
-                    "sharing_percentage": cohort.sharing_percentage,
-                    "cash_cap": cohort.cash_cap,
+                    "cohort_month": trade.cohort_month.strftime("%Y-%m-%d"),
+                    "sharing_percentage": trade.sharing_percentage,
+                    "cash_cap": trade.cash_cap,
                 }
             )
-        spend_df = pd.DataFrame(spend_data)
 
         # Get thresholds
         thresholds = self.thresholds.list_thresholds_by_company(company_id)
@@ -271,16 +398,16 @@ class AnalyticsOperations:
             "payments_df": payments_df,
             "spend_df": spend_df,
             "thresholds": threshold_list,
-            "cohort_trades": cohort_trades,
+            "cohort_trades": trade_list,
         }
 
         logger.debug(
             "Analytics data prepared",
             company_id=company_id,
             payments_count=len(payments_df),
-            cohorts_count=len(spend_df),
+            spends_count=len(spend_df),
             thresholds_count=len(threshold_list),
-            cohort_trades_count=len(cohort_trades),
+            trades_count=len(trade_list),
         )
 
         return data
@@ -295,9 +422,10 @@ class DatabaseOperations:
     def __init__(self, db: Session):
         self.db = db
         self.companies = CompanyOperations(db)
-        self.cohorts = CohortOperations(db)
+        self.trades = TradeOperations(db)
         self.payments = PaymentOperations(db)
         self.thresholds = ThresholdOperations(db)
+        self.spends = SpendOperations(db)
         self.analytics = AnalyticsOperations(db)
 
 
