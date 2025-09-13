@@ -62,8 +62,8 @@ async def create_company(company: CompanyCreate, db_ops: DatabaseOperations = De
     existing = db_ops.companies.get_company_by_name(company.name)
     if existing:
         logger.warning("Company already exists", name=company.name, existing_id=existing.id)
-        raise HTTPException(status_code=400, detail="Company with this name already exists")
-
+        return existing
+    
     try:
         return db_ops.companies.create_company(company.name)
     except Exception as e:
