@@ -18,7 +18,7 @@ def company_id():
     # First ensure we have a company to test with
     response = requests.get(f"{BASE_URL}/companies/")
     companies = response.json()
-    
+
     if companies:
         company_id = companies[0]["id"]
         logger.info("Using existing company for tests", company_id=company_id, name=companies[0]["name"])
@@ -52,7 +52,7 @@ def test_companies():
     response = requests.get(f"{BASE_URL}/companies/")
     companies = response.json()
     logger.info("List companies", status_code=response.status_code, company_count=len(companies))
-    
+
     assert response.status_code == 200
     assert isinstance(companies, list)
 
@@ -95,6 +95,7 @@ test_002,2024-01-20,1500"""
         status_code=response.status_code,
         response=response.json() if response.status_code == 200 else response.text,
     )
+
 
 @pytest.mark.api
 def test_thresholds(company_id):

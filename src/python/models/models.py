@@ -1,5 +1,5 @@
 from __future__ import annotations
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, TYPE_CHECKING
 from datetime import date, datetime
 import src.python.db.schemas as db_schemas
@@ -20,7 +20,7 @@ class CompanyResponse(CompanyBase):
 
     class Config:
         from_attributes = True
-    
+
     @classmethod
     def from_db(cls, company: db_schemas.Company) -> CompanyResponse:
         """Convert Company DB model to CompanyResponse API schema"""
@@ -49,7 +49,7 @@ class TradeResponse(TradeBase):
 
     class Config:
         from_attributes = True
-    
+
     @classmethod
     def from_db(cls, trade: db_schemas.Trade) -> TradeResponse:
         """Convert Trade DB model to TradeResponse API schema"""
@@ -74,6 +74,13 @@ class PaymentCreate(PaymentBase):
     pass
 
 
+class PaymentUpdate(BaseModel):
+    customer_id: Optional[str] = None
+    payment_date: Optional[date] = None
+    amount: Optional[float] = None
+    cohort_month: Optional[date] = None
+
+
 class PaymentResponse(PaymentBase):
     id: int
     company_id: int
@@ -82,7 +89,7 @@ class PaymentResponse(PaymentBase):
 
     class Config:
         from_attributes = True
-    
+
     @classmethod
     def from_db(cls, payment: db_schemas.Payment) -> PaymentResponse:
         """Convert Payment DB model to PaymentResponse API schema"""
@@ -114,7 +121,7 @@ class ThresholdResponse(ThresholdBase):
 
     class Config:
         from_attributes = True
-    
+
     @classmethod
     def from_db(cls, threshold: db_schemas.Threshold) -> ThresholdResponse:
         """Convert Threshold DB model to ThresholdResponse API schema"""
@@ -152,9 +159,9 @@ class SpendResponse(SpendBase):
 
     class Config:
         from_attributes = True
-    
+
     @classmethod
-    def from_db(cls, spend: "db_schemas.Spend", include_company: bool = False) -> "SpendResponse":
+    def from_db(cls, spend: db_schemas.Spend, include_company: bool = False) -> SpendResponse:
         """Convert Spend DB model to SpendResponse API schema"""
         response = cls(
             id=spend.id,
@@ -163,10 +170,10 @@ class SpendResponse(SpendBase):
             spend=spend.spend,
             created_at=spend.created_at,
         )
-        
+
         if include_company and spend.company:
             response.company = CompanyResponse.from_db(spend.company)
-            
+
         return response
 
 
@@ -179,27 +186,76 @@ class MetricsResponse(BaseModel):
     cac_estimate: float
 
 
-class PeriodData(BaseModel):
-    period: int
-    payment: float
-    share_applied: float
-    collected: float
-    cumulative: float
-    status: str
-    threshold_failed: bool
-    capped: bool
+# Cashflow schemas
+class Cohort(BaseModel):
+    cohort_month: date
+    company_id: int
+    spend: float
+    periods: List[Period]
+    customers: List[str]
+    cumulative_payment: float
 
 
-class TradeCashflowData(BaseModel):
+class FundedCohort(Cohort):
     trade_id: int
-    cohort_month: str
     sharing_percentage: float
     cash_cap: float
     cumulative_collected: float
-    periods: List[PeriodData]
+    periods: List[FundedPeriod]
+    capped: bool
+
+
+class Period(BaseModel):
+    period: int
+    month: date
+    payment: float
+    cumulative_payment: float
+
+
+class FundedPeriod(Period):
+    theshold_payment_percentage: Optional[float] = Field(float)
+    threshold_failed: bool
+    share_applied: float
+    collected: float
+    cumulative_collected: float
+    capped: bool
+
+
+class PredictedFundedPeriod(FundedPeriod):
+    predicted: bool = True
 
 
 class CashflowResponse(BaseModel):
-    trades: List[TradeCashflowData]
+    cohorts: List[Cohort | FundedCohort]
 
 
+# Customer schemas
+class CustomerBase(BaseModel):
+    customer_name: str
+    cohort_month: date
+    spend_id: int
+
+
+class CustomerResponse(CustomerBase):
+    id: int
+    created_at: Optional[datetime] = None
+    spend: Optional[SpendResponse] = None
+
+    class Config:
+        from_attributes = True
+
+    @classmethod
+    def from_db(cls, customer: db_schemas.Customer, include_spend: bool = False) -> CustomerResponse:
+        """Convert Customer DB model to CustomerResponse API schema"""
+        response = cls(
+            id=customer.id,
+            customer_name=customer.customer_name,
+            cohort_month=customer.cohort_month,
+            spend_id=customer.spend_id,
+            created_at=customer.created_at,
+        )
+
+        if include_spend and customer.spend:
+            response.spend = SpendResponse.from_db(customer.spend)
+
+        return response

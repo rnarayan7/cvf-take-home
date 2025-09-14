@@ -5,275 +5,185 @@ Based on the Jupyter notebook exercises
 
 import pandas as pd
 import numpy as np
-from typing import List, Dict
-from datetime import date
+from typing import List, Dict, Optional
+from collections import defaultdict
+from src.python.db.schemas import Trade, Payment, Spend, Threshold, Date
+from src.python.models.models import CashflowResponse, Cohort, FundedCohort, Period, FundedPeriod
+from dataclasses import dataclass, field
 
 
-def payment_df_to_cohort_df(payment_df: pd.DataFrame) -> pd.DataFrame:
+def _aggregate_payments_by_month(payments: List[Payment]) -> Dict:
+    payments_by_month = defaultdict(list)
+    for p in payments:
+        month_key = p.payment_date.replace(day=1)
+        payments_by_month[month_key].append(p)
+    return payments_by_month
+
+
+def compute_company_cohort_cashflows(
+    company_id: str, trades: List[Trade], payments: List[Payment], spends: List[Spend], thresholds: List[Threshold]
+) -> List[Cohort | FundedCohort]:
+    
+    @dataclass
+    class ConsolidatedCohort:
+        spend: Spend
+        trade: Optional[Trade] = None
+        payments: List[Payment] = field(default_factory=list)
+
+    consolidated = {s.cohort_month: ConsolidatedCohort(spend=s) for s in spends}
+    for tr in trades:
+        consolidated[tr.cohort_month].trade = tr
+    for p in payments:
+        consolidated[p.cohort_month].payments.append(p)
+
+    cohorts: List[Cohort | FundedCohort] = []
+    for cohort_month, ch in consolidated.items():
+        payments_by_month = _aggregate_payments_by_month(payments=ch.payments)
+        thresholds_by_period_num = {th.payment_period_month: th for th in thresholds}
+        customers = [p.customer_id for p in payments]
+
+        cumulative_payment = 0
+        cumulative_collected = 0
+        capped = False
+
+        periods = []
+
+        for period_num in range(len(payments_by_month.keys())):
+            payment_period_month = list(payments_by_month.keys())[period_num]
+            payments = payments_by_month[payment_period_month]
+
+            payment_sum = sum([p.amount for p in payments])
+            cumulative_payment += payment_sum
+
+            if ch.trade:
+                payment_percentage = payment_sum / ch.spend.spend
+                threshold = thresholds_by_period_num.get(period_num, None)
+                threshold_failed = threshold is not None and payment_percentage < threshold.minimum_payment_percent
+                share_applied = 1 if threshold_failed else ch.trade.sharing_percentage
+                collected = min(share_applied * payment_sum, ch.trade.cash_cap - cumulative_collected)
+                cumulative_collected += collected
+                period_capped = collected == ch.trade.cash_cap
+                capped = True if period_capped else capped
+
+                periods.append(
+                    FundedPeriod(
+                        period=period_num,
+                        month=payment_period_month,
+                        payment=payment_sum,
+                        cumulative_payment=cumulative_payment,
+                        threshold_payment_percentage=threshold.minimum_payment_percent if threshold else None,
+                        threshold_failed=threshold_failed,
+                        share_applied=share_applied,
+                        collected=collected,
+                        cumulative_collected=cumulative_collected,
+                        capped=period_capped,
+                    )
+                )
+
+            else:
+                periods.append(
+                    Period(
+                        period=period_num,
+                        month=payment_period_month,
+                        payment=payment_sum,
+                        cumulative_payment=cumulative_payment,
+                    )
+                )
+
+        if ch.trade:
+            cohorts.append(
+                FundedCohort(
+                    cohort_month=cohort_month,
+                    company_id=company_id,
+                    spend=ch.spend.spend,
+                    periods=periods,
+                    customers=customers,
+                    cumulative_payment=cumulative_payment,
+                    trade_id=ch.trade.id,
+                    sharing_percentage=ch.trade.sharing_percentage,
+                    cash_cap=ch.trade.cash_cap,
+                    cumulative_collected=cumulative_collected,
+                    capped=capped,
+                )
+            )
+        else:
+            cohorts.append(
+                Cohort(
+                    cohort_month=cohort_month,
+                    company_id=company_id,
+                    spend=ch.spend.spend,
+                    periods=periods,
+                    customers=customers,
+                    cumulative_payment=cumulative_payment,
+                )
+            )
+
+    return cohorts
+
+
+def cohorts_to_cvf_cashflows_df(cohorts: List[Cohort | FundedCohort]) -> pd.DataFrame:
     """
-    Convert raw payments DataFrame to cohort matrix.
-
+    Convert the output of compute_company_cohort_cashflows to CVF cashflows DataFrame format
+    matching the structure from the take_home.ipynb notebook.
+    
     Args:
-        payment_df: DataFrame with columns ['customer_id', 'payment_date', 'amount']
-
+        cohorts: List of Cohort and FundedCohort objects
+        
     Returns:
-        DataFrame with cohorts as index and payment periods as columns
+        DataFrame with cohort dates as index, monthly periods as columns, and CVF collections as values
     """
-    df = payment_df.copy()
-
-    # Ensure payment_date is datetime
-    if not pd.api.types.is_datetime64_any_dtype(df["payment_date"]):
-        df["payment_date"] = pd.to_datetime(df["payment_date"])
-
-    # Calculate cohort month for each customer (first payment month)
-    cohort_df = df.groupby("customer_id")["payment_date"].min().reset_index()
-    cohort_df["cohort"] = cohort_df["payment_date"].dt.to_period("M").dt.to_timestamp()
-
-    # Merge cohort info back to payments
-    df = df.merge(cohort_df[["customer_id", "cohort"]], on="customer_id")
-
-    # Round payments to nearest month
-    df["payment_month"] = df["payment_date"].dt.to_period("M").dt.to_timestamp()
-
-    # Calculate payment period (months since cohort)
-    df["payment_period"] = (df["payment_month"].dt.year - df["cohort"].dt.year) * 12 + (
-        df["payment_month"].dt.month - df["cohort"].dt.month
-    )
-
-    # Filter out negative periods (shouldn't happen, but safety)
-    df = df[df["payment_period"] >= 0]
-
-    # Group and pivot to create cohort matrix
-    grouped_df = df.groupby(["cohort", "payment_period"])["amount"].sum()
-    cohort_matrix = (
-        grouped_df.reset_index().pivot(index="cohort", columns="payment_period", values="amount").fillna(0.0)
-    )
-
-    # Rename axes for clarity
-    cohort_matrix.index.name = None
-    cohort_matrix.columns.name = None
-
-    return cohort_matrix
-
-
-def apply_predictions_to_cohort_df(
-    predictions_dict: Dict[str, Dict[str, float]],
-    spend_df: pd.DataFrame,
-    cohort_df: pd.DataFrame,
-    horizon_months: int = 24,
-    scenario: str = None,
-) -> pd.DataFrame:
-    """
-    Apply predictions to extend cohort matrix with predicted values.
-
-    Args:
-        predictions_dict: Dict with cohort dates as keys, prediction params as values
-        spend_df: DataFrame with spend by cohort
-        cohort_df: Actual payments cohort matrix
-        horizon_months: Total months to project
-        scenario: Filter predictions by scenario if specified
-
-    Returns:
-        Extended cohort matrix with predictions
-    """
-    # Prepare spend data
-    spend = spend_df.copy()
-    if "cohort" in spend.columns:
-        spend["cohort"] = pd.to_datetime(spend["cohort"]).dt.to_period("M").dt.to_timestamp()
-        spend = spend.set_index("cohort")
-    spend = spend.sort_index()
-
-    # Initialize output matrix
-    pred_cols = list(range(horizon_months))
-    result = cohort_df.copy()
-
-    # Ensure we have all columns up to horizon
-    for col in pred_cols:
-        if col not in result.columns:
-            result[col] = 0.0
-
-    result = result[pred_cols]  # Reorder columns
-
-    # Apply predictions for each cohort
-    for cohort in result.index:
-        cohort_str = cohort.strftime("%Y-%m-%d")
-
-        if cohort_str not in predictions_dict:
-            continue  # No predictions for this cohort
-
-        pred_config = predictions_dict[cohort_str]
-
-        # Skip if scenario doesn't match
-        if scenario and "scenario" in pred_config and pred_config["scenario"] != scenario:
-            continue
-
-        m0 = float(pred_config["m0"])
-        churn = float(pred_config["churn"])
-
-        # Get spend for this cohort
-        spend_amount = float(spend.loc[cohort, "spend"]) if cohort in spend.index else 0.0
-
-        # Find last actual payment period
-        cohort_row = result.loc[cohort].fillna(0.0)
-        last_actual_period = -1
-
-        # Find the last period with actual (non-zero) data from original cohort_df
-        for period in sorted(cohort_df.columns.intersection(result.columns)):
-            if pd.notna(cohort_df.at[cohort, period]) and cohort_df.at[cohort, period] != 0:
-                last_actual_period = max(last_actual_period, period)
-
-        # Set m0 prediction for period 0 if no actual and we have spend
-        if result.at[cohort, 0] == 0 and spend_amount > 0:
-            result.at[cohort, 0] = m0 * spend_amount
-            if last_actual_period < 0:
-                last_actual_period = 0
-
-        # Apply decay from last actual value
-        if last_actual_period >= 0:
-            reference_value = result.at[cohort, last_actual_period]
-
-            for period in range(last_actual_period + 1, horizon_months):
-                # Don't override existing actuals
-                if (
-                    period in cohort_df.columns
-                    and pd.notna(cohort_df.at[cohort, period])
-                    and cohort_df.at[cohort, period] != 0
-                ):
-                    result.at[cohort, period] = cohort_df.at[cohort, period]
-                    reference_value = result.at[cohort, period]  # Update reference for decay
-                else:
-                    # Apply geometric decay
-                    decay_periods = period - last_actual_period
-                    result.at[cohort, period] = reference_value * ((1.0 - churn) ** decay_periods)
-
-    result.columns.name = "payment_period"
-    return result.sort_index()
-
-
-def apply_threshold_to_cohort_df(
-    cohort_df: pd.DataFrame, spend_df: pd.DataFrame, thresholds: List[Dict[str, float]]
-) -> pd.DataFrame:
-    """
-    Apply threshold checks to cohort payments.
-
-    Args:
-        cohort_df: Cohort payment matrix
-        spend_df: Spend by cohort
-        thresholds: List of threshold rules
-
-    Returns:
-        Boolean DataFrame indicating threshold failures (True = failed)
-    """
-    # Prepare spend data
-    spend = spend_df.copy()
-    if "cohort" in spend.columns:
-        spend["cohort"] = pd.to_datetime(spend["cohort"]).dt.to_period("M").dt.to_timestamp()
-        spend = spend.set_index("cohort")
-    spend = spend.sort_index()
-
-    # Create threshold lookup
-    threshold_by_period = {int(t["payment_period_month"]): float(t["minimum_payment_percent"]) for t in thresholds}
-
-    # Initialize failure mask (False = passed, True = failed)
-    failure_mask = pd.DataFrame(False, index=cohort_df.index, columns=cohort_df.columns)
-
-    for period in cohort_df.columns:
-        if period not in threshold_by_period:
-            continue
-
-        required_percent = threshold_by_period[period]
-
-        # Calculate payment ratio vs spend for each cohort
-        spend_reindexed = spend.reindex(cohort_df.index)["spend"]
-
-        # Avoid division by zero
-        payment_ratios = cohort_df[period] / spend_reindexed.replace({0: np.nan})
-
-        # Mark as failed if below threshold
-        failure_mask[period] = (payment_ratios < required_percent).fillna(False)
-
-    failure_mask.columns.name = "payment_period"
-    return failure_mask
-
-
-def get_cvf_cashflows_df(
-    predicted_cohort_df: pd.DataFrame,
-    spend_df: pd.DataFrame,
-    thresholds: List[Dict[str, float]],
-    trades: List[Dict[str, float]],
-) -> pd.DataFrame:
-    """
-    Calculate CVF cashflows based on trades, sharing rates, thresholds, and caps.
-
-    Args:
-        predicted_cohort_df: Cohort matrix with predictions
-        spend_df: Spend by cohort
-        thresholds: Threshold rules
-        trades: Trade definitions
-
-    Returns:
-        DataFrame with CVF collections by cohort and period
-    """
-    # Get threshold failure mask
-    threshold_mask = apply_threshold_to_cohort_df(predicted_cohort_df, spend_df, thresholds)
-
-    def normalize_date(date_str: str) -> pd.Timestamp:
-        return pd.to_datetime(date_str).to_period("M").to_timestamp()
-
-    # Initialize output DataFrame
-    periods = list(predicted_cohort_df.columns)
-    result = pd.DataFrame(0.0, index=pd.Index([], name="cohort"), columns=periods)
-
-    for trade in trades:
-        cohort = normalize_date(trade["cohort_start_at"])
-
-        if cohort not in predicted_cohort_df.index:
-            # Add empty row for missing cohort
-            empty_row = pd.Series(0.0, index=periods, name=cohort)
-            result = pd.concat([result, empty_row.to_frame().T])
-            continue
-
-        base_share = float(trade["sharing_percentage"])
-        cash_cap = float(trade["cash_cap"])
-
-        # Get payments and threshold failures for this cohort
-        payments = predicted_cohort_df.loc[cohort, periods].fillna(0.0)
-        failures = (
-            threshold_mask.loc[cohort, periods] if cohort in threshold_mask.index else pd.Series(False, index=periods)
-        )
-
-        # Calculate collections period by period
-        collections = []
-        cumulative = 0.0
-
-        for period in periods:
-            if cumulative >= cash_cap:
-                collections.append(0.0)
-                continue
-
-            # Determine sharing rate (100% if threshold failed, otherwise base rate)
-            share_rate = 1.0 if bool(failures[period]) else base_share
-
-            # Calculate collection amount
-            payment_amount = payments[period]
-            collection_amount = payment_amount * share_rate
-
-            # Apply cash cap
-            remaining_cap = max(0.0, cash_cap - cumulative)
-            final_collection = min(collection_amount, remaining_cap)
-
-            collections.append(final_collection)
-            cumulative += final_collection
-
-        # Add trade row to result
-        trade_row = pd.Series(collections, index=periods, name=cohort)
-        result = pd.concat([result, trade_row.to_frame().T])
-
-    # Group by cohort (in case of multiple trades per cohort) and sum
-    result = result.groupby(result.index).sum().sort_index()
-    result.columns.name = "payment_period"
-
-    return result
+    if not cohorts:
+        return pd.DataFrame()
+    
+    # Convert cohort months to timestamps and find date range
+    cohort_dates = []
+    max_periods = 0
+    
+    for cohort in cohorts:
+        # Parse cohort_month string to timestamp
+        if isinstance(cohort.cohort_month, str):
+            cohort_date = pd.to_datetime(cohort.cohort_month)
+        else:
+            cohort_date = pd.to_datetime(cohort.cohort_month)
+        cohort_dates.append(cohort_date)
+        
+        # Find the maximum number of periods across all cohorts
+        if len(cohort.periods) > max_periods:
+            max_periods = len(cohort.periods)
+    
+    if not cohort_dates:
+        return pd.DataFrame()
+        
+    # Create date range for columns (monthly periods)
+    start_date = min(cohort_dates)
+    # Create enough columns to accommodate all periods from all cohorts
+    total_months = max_periods + 12  # Extra buffer for proper display
+    date_columns = pd.date_range(start=start_date, periods=total_months, freq='MS')
+    
+    # Initialize DataFrame with cohort dates as index and monthly periods as columns
+    cvf_df = pd.DataFrame(0.0, index=sorted(cohort_dates), columns=date_columns)
+    
+    # Populate the DataFrame with CVF collection data
+    for cohort in cohorts:
+        # Parse cohort date
+        if isinstance(cohort.cohort_month, str):
+            cohort_date = pd.to_datetime(cohort.cohort_month)
+        else:
+            cohort_date = pd.to_datetime(cohort.cohort_month)
+            
+        # Only process funded cohorts (those with trades) for CVF collections
+        if isinstance(cohort, FundedCohort):
+            for period in cohort.periods:
+                # Calculate the actual month for this period
+                period_month = cohort_date + pd.DateOffset(months=period.period)
+                
+                # Ensure the period_month exists in our columns
+                if period_month in cvf_df.columns:
+                    # Use the collected amount for CVF cashflows
+                    cvf_df.loc[cohort_date, period_month] = period.collected
+        # For unfunded cohorts, we don't collect anything (leave as 0)
+    
+    return cvf_df
 
 
 # Helper functions for improved calculation
@@ -303,18 +213,3 @@ def calculate_ltv_cac_metrics(
         "total_payments": total_payments,
         "total_spend": total_spend,
     }
-
-
-def calculate_current_month_owed(cashflows_df: pd.DataFrame, as_of_month: date) -> float:
-    """Calculate total amount owed for current month"""
-
-    # Convert as_of_month to period index if needed
-    current_period = pd.Timestamp(as_of_month).to_period("M").to_timestamp()
-
-    # Find matching column (this would need refinement based on your cashflow structure)
-    # For now, return sum of latest period's collections
-    if len(cashflows_df.columns) > 0:
-        latest_period = cashflows_df.columns[-1]
-        return cashflows_df[latest_period].sum()
-
-    return 0.0

@@ -57,7 +57,7 @@ def initialize_database():
 def seed_database(force_recreate=False):
     """Seed database with sample data"""
     from src.python.db.seed_data import seed_database
-    
+
     logger.info("Seeding database with sample data", force_recreate=force_recreate)
     seed_database(force_recreate=force_recreate)
     logger.info("Database seeding completed")

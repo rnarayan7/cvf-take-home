@@ -249,7 +249,6 @@ class TestPerformanceConsiderations:
         assert isinstance(result, pd.DataFrame)
         assert len(result) > 0
 
-
     def test_computation_time_scaling(self):
         """Test that computation scales reasonably with data size"""
         sizes = [100, 1000, 5000]

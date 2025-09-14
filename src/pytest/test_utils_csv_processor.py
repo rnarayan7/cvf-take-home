@@ -120,7 +120,7 @@ def test_non_csv_file():
     try:
         processor.validate_csv_file(upload_file)
         logger.error("Should have failed but didn't")
-        assert(False)
+        assert False
     except Exception as e:
         logger.info("Correctly rejected non-CSV file", error=str(e))
 
@@ -131,7 +131,7 @@ async def test_factory_function():
     logger.info("Testing factory function")
 
     processor = get_payments_csv_processor()
-    assert(isinstance(processor, PaymentsCSVProcessor))
+    assert isinstance(processor, PaymentsCSVProcessor)
 
 
 async def main():
