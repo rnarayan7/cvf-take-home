@@ -11,7 +11,7 @@ import pandas as pd
 import structlog
 from fastapi import Depends
 
-from src.python.db.schemas import Company, Trade, Payment, Threshold, Spend
+from src.python.db.schemas import Company, Trade, Payment, Threshold, Spend, Customer
 from src.python.db.database import get_db
 
 logger = structlog.get_logger(__file__)
@@ -160,6 +160,57 @@ class PaymentOperations:
             .all()
         )
 
+    def get_payment_by_id(self, payment_id: int) -> Optional[Payment]:
+        """Get payment by ID"""
+        logger.debug("Fetching payment", payment_id=payment_id)
+        return self.db.query(Payment).filter(Payment.id == payment_id).first()
+
+    def update_payment(
+        self,
+        payment_id: int,
+        amount: Optional[float] = None,
+        payment_date: Optional[date] = None,
+        customer_id: Optional[str] = None,
+        cohort_month: Optional[date] = None,
+    ) -> Optional[Payment]:
+        """Update an existing payment record"""
+        logger.info("Updating payment", payment_id=payment_id)
+
+        payment = self.get_payment_by_id(payment_id)
+        if not payment:
+            logger.warning("Payment not found for update", payment_id=payment_id)
+            return None
+
+        if amount is not None:
+            payment.amount = amount
+        if payment_date is not None:
+            payment.payment_date = payment_date
+        if customer_id is not None:
+            payment.customer_id = customer_id
+        if cohort_month is not None:
+            payment.cohort_month = cohort_month
+
+        self.db.commit()
+        self.db.refresh(payment)
+
+        logger.info("Payment updated", payment_id=payment_id)
+        return payment
+
+    def delete_payment(self, payment_id: int) -> bool:
+        """Delete a payment record"""
+        logger.info("Deleting payment", payment_id=payment_id)
+
+        payment = self.get_payment_by_id(payment_id)
+        if not payment:
+            logger.warning("Payment not found for deletion", payment_id=payment_id)
+            return False
+
+        self.db.delete(payment)
+        self.db.commit()
+
+        logger.info("Payment deleted", payment_id=payment_id)
+        return True
+
     def get_payments_dataframe(self, company_id: int) -> pd.DataFrame:
         """Get payments as pandas DataFrame for calculations"""
         logger.debug("Converting payments to DataFrame", company_id=company_id)
@@ -254,11 +305,16 @@ class SpendOperations:
         logger.debug("Fetching spend", spend_id=spend_id)
         return self.db.query(Spend).filter(Spend.id == spend_id).first()
 
-    def update_spend(self, spend_id: int, company_id: Optional[int] = None, 
-                    cohort_month: Optional[date] = None, spend: Optional[float] = None) -> Optional[Spend]:
+    def update_spend(
+        self,
+        spend_id: int,
+        company_id: Optional[int] = None,
+        cohort_month: Optional[date] = None,
+        spend: Optional[float] = None,
+    ) -> Optional[Spend]:
         """Update an existing spend record"""
         logger.info("Updating spend", spend_id=spend_id)
-        
+
         spend_record = self.get_spend_by_id(spend_id)
         if not spend_record:
             logger.warning("Spend not found for update", spend_id=spend_id)
@@ -280,7 +336,7 @@ class SpendOperations:
     def delete_spend(self, spend_id: int) -> bool:
         """Delete a spend record"""
         logger.info("Deleting spend", spend_id=spend_id)
-        
+
         spend_record = self.get_spend_by_id(spend_id)
         if not spend_record:
             logger.warning("Spend not found for deletion", spend_id=spend_id)
@@ -292,29 +348,39 @@ class SpendOperations:
         logger.info("Spend deleted", spend_id=spend_id)
         return True
 
-    def list_spends(self, company_id: Optional[int] = None, cohort_month: Optional[date] = None, 
-                   limit: Optional[int] = None, offset: Optional[int] = None) -> List[Spend]:
+    def list_spends(
+        self,
+        company_id: Optional[int] = None,
+        cohort_month: Optional[date] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Spend]:
         """List spends with optional filtering and pagination"""
         logger.debug("Listing spends", company_id=company_id, cohort_month=cohort_month, limit=limit, offset=offset)
-        
+
         query = self.db.query(Spend)
-        
+
         if company_id is not None:
             query = query.filter(Spend.company_id == company_id)
         if cohort_month is not None:
             query = query.filter(Spend.cohort_month == cohort_month)
-            
+
         query = query.order_by(Spend.cohort_month.desc(), Spend.id.desc())
-        
+
         if offset is not None:
             query = query.offset(offset)
         if limit is not None:
             query = query.limit(limit)
-            
+
         return query.all()
 
-    def list_spends_by_company(self, company_id: int, cohort_month: Optional[date] = None,
-                              limit: Optional[int] = None, offset: Optional[int] = None) -> List[Spend]:
+    def list_spends_by_company(
+        self,
+        company_id: int,
+        cohort_month: Optional[date] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Spend]:
         """List all spends for a company with optional filtering"""
         logger.debug("Listing spends by company", company_id=company_id, cohort_month=cohort_month)
         return self.list_spends(company_id=company_id, cohort_month=cohort_month, limit=limit, offset=offset)
@@ -351,6 +417,44 @@ class SpendOperations:
         return df
 
 
+class CustomerOperations:
+    """Database operations for Customer model"""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_customer_by_id(self, customer_id: int) -> Optional[Customer]:
+        """Get customer by ID"""
+        logger.debug("Fetching customer", customer_id=customer_id)
+        return self.db.query(Customer).filter(Customer.id == customer_id).first()
+
+    def list_customers(
+        self,
+        cohort_month: Optional[date] = None,
+        spend_id: Optional[int] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Customer]:
+        """List customers with optional filtering and pagination"""
+        logger.debug("Listing customers", cohort_month=cohort_month, spend_id=spend_id, limit=limit, offset=offset)
+
+        query = self.db.query(Customer)
+
+        if cohort_month is not None:
+            query = query.filter(Customer.cohort_month == cohort_month)
+        if spend_id is not None:
+            query = query.filter(Customer.spend_id == spend_id)
+
+        query = query.order_by(Customer.cohort_month.desc(), Customer.id.desc())
+
+        if offset is not None:
+            query = query.offset(offset)
+        if limit is not None:
+            query = query.limit(limit)
+
+        return query.all()
+
+
 class AnalyticsOperations:
     """Database operations for analytics and calculations"""
 
@@ -367,7 +471,7 @@ class AnalyticsOperations:
 
         # Get payments as DataFrame
         payments_df = self.payments.get_payments_dataframe(company_id)
-        
+
         # Get spends as DataFrame
         spend_df = self.spends.get_spends_dataframe(company_id)
 
@@ -413,8 +517,6 @@ class AnalyticsOperations:
         return data
 
 
-
-
 # Session-aware database operations class
 class DatabaseOperations:
     """Session-aware database operations interface"""
@@ -426,6 +528,7 @@ class DatabaseOperations:
         self.payments = PaymentOperations(db)
         self.thresholds = ThresholdOperations(db)
         self.spends = SpendOperations(db)
+        self.customers = CustomerOperations(db)
         self.analytics = AnalyticsOperations(db)
 
 
