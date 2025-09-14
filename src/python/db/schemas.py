@@ -1,4 +1,18 @@
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, Boolean, DateTime, Text, Numeric, CheckConstraint, UniqueConstraint, Index
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    Date,
+    ForeignKey,
+    Boolean,
+    DateTime,
+    Text,
+    Numeric,
+    CheckConstraint,
+    UniqueConstraint,
+    Index,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -35,9 +49,9 @@ class Trade(Base):
 
     # Constraints
     __table_args__ = (
-        UniqueConstraint('company_id', 'cohort_month', name='unique_company_cohort_month'),
-        CheckConstraint('sharing_percentage >= 0 AND sharing_percentage <= 1', name='check_sharing_percentage'),
-        CheckConstraint('cash_cap >= 0', name='check_cash_cap'),
+        UniqueConstraint("company_id", "cohort_month", name="unique_company_cohort_month"),
+        CheckConstraint("sharing_percentage >= 0 AND sharing_percentage <= 1", name="check_sharing_percentage"),
+        CheckConstraint("cash_cap >= 0", name="check_cash_cap"),
     )
 
     # Relationships
@@ -70,8 +84,10 @@ class Threshold(Base):
 
     # Constraints
     __table_args__ = (
-        CheckConstraint('payment_period_month >= 0', name='check_payment_period_month'),
-        CheckConstraint('minimum_payment_percent >= 0 AND minimum_payment_percent <= 1', name='check_minimum_payment_percent'),
+        CheckConstraint("payment_period_month >= 0", name="check_payment_period_month"),
+        CheckConstraint(
+            "minimum_payment_percent >= 0 AND minimum_payment_percent <= 1", name="check_minimum_payment_percent"
+        ),
     )
 
     # Relationships
@@ -89,11 +105,26 @@ class Spend(Base):
 
     # Constraints
     __table_args__ = (
-        UniqueConstraint('company_id', 'cohort_month', name='unique_company_spend_cohort_month'),
-        CheckConstraint('spend >= 0', name='check_spend_positive'),
+        UniqueConstraint("company_id", "cohort_month", name="unique_company_spend_cohort_month"),
+        CheckConstraint("spend >= 0", name="check_spend_positive"),
     )
 
     # Relationships
     company = relationship("Company", back_populates="spends")
+    customers = relationship("Customer", back_populates="spend")
 
 
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_name = Column(String, nullable=False)
+    cohort_month = Column(Date, nullable=False, index=True)
+    spend_id = Column(Integer, ForeignKey("spends.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Constraints
+    __table_args__ = (Index("ix_customers_cohort_month_spend_id", "cohort_month", "spend_id"),)
+
+    # Relationships
+    spend = relationship("Spend", back_populates="customers")
