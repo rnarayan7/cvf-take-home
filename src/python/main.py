@@ -5,22 +5,26 @@ from typing import List, Dict, Any, Optional
 from datetime import date, datetime
 import structlog
 
-from src.python.utils.calc import payment_df_to_cohort_df, get_cvf_cashflows_df
+from src.python.utils.calc import compute_company_cohort_cashflows, cohorts_to_cvf_cashflows_df
 from src.python.models.models import (
     CompanyCreate,
     CompanyResponse,
     TradeCreate,
     TradeResponse,
     PaymentResponse,
+    PaymentUpdate,
     ThresholdCreate,
     ThresholdResponse,
     SpendCreate,
     SpendUpdate,
     SpendResponse,
     MetricsResponse,
+    CashflowResponse,
 )
 from src.python.utils.csv_processor import get_payments_csv_processor
 from src.python.db.db_operations import get_db_operations, DatabaseOperations
+
+FORECAST_TIMEFRAME = 36
 
 logger = structlog.get_logger(__file__)
 
@@ -36,6 +40,7 @@ app = FastAPI(
     * **Trades**: Track trading terms by cohort month
     * **Payments**: Upload and manage customer payment data
     * **Spends**: Manage spending data by company and cohort month (company-scoped)
+    * **Customers**: View customer records with spend relationship data (read-only)
     * **Analytics**: Calculate metrics like MOIC, LTV, CAC
     * **Cashflows**: View projected cashflows with trading terms
     * **Thresholds**: Set minimum payment thresholds
@@ -65,9 +70,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Session-aware database operations dependency
-# get_db_operations is now defined in db_operations.py with proper dependency injection
 
 
 @app.get("/")
@@ -125,9 +127,7 @@ async def get_company(company_id: int, db_ops: DatabaseOperations = Depends(get_
 @app.post("/companies/{company_id}/trades/", response_model=TradeResponse, tags=["Trades"])
 async def create_trade(company_id: int, trade: TradeCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """Create a new trade (trading terms) for a company cohort"""
-    logger.info(
-        "Creating trade", company_id=company_id, cohort_month=trade.cohort_month
-    )
+    logger.info("Creating trade", company_id=company_id, cohort_month=trade.cohort_month)
 
     # Validate company exists
     if not db_ops.companies.company_exists(company_id):
@@ -141,9 +141,7 @@ async def create_trade(company_id: int, trade: TradeCreate, db_ops: DatabaseOper
         raise HTTPException(status_code=400, detail="Trade for this month already exists")
 
     try:
-        db_trade = db_ops.trades.create_trade(
-            company_id, trade.cohort_month, trade.sharing_percentage, trade.cash_cap
-        )
+        db_trade = db_ops.trades.create_trade(company_id, trade.cohort_month, trade.sharing_percentage, trade.cash_cap)
         return TradeResponse.from_db(db_trade)
     except Exception as e:
         logger.error("Failed to create trade", company_id=company_id, error=str(e))
@@ -194,8 +192,150 @@ async def list_payments(company_id: int, db_ops: DatabaseOperations = Depends(ge
     return [PaymentResponse.from_db(payment) for payment in db_payments]
 
 
+@app.get("/companies/{company_id}/payments/{payment_id}", response_model=PaymentResponse, tags=["Payments"])
+async def get_company_payment(
+    company_id: int, payment_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)
+):
+    """Get specific payment by ID for a specific company"""
+    logger.info("Getting company payment", company_id=company_id, payment_id=payment_id)
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for payment retrieval", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Get payment
+        payment = db_ops.payments.get_payment_by_id(payment_id)
+
+        if not payment:
+            logger.warning("Payment not found", company_id=company_id, payment_id=payment_id)
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        # Validate payment belongs to the company
+        if payment.company_id != company_id:
+            logger.warning(
+                "Payment does not belong to company",
+                company_id=company_id,
+                payment_id=payment_id,
+                payment_company_id=payment.company_id,
+            )
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        return PaymentResponse.from_db(payment)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get company payment", company_id=company_id, payment_id=payment_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get payment")
+
+
+@app.put("/companies/{company_id}/payments/{payment_id}", response_model=PaymentResponse, tags=["Payments"])
+async def update_company_payment(
+    company_id: int,
+    payment_id: int,
+    payment_update: PaymentUpdate,
+    db_ops: DatabaseOperations = Depends(get_db_operations),
+):
+    """Update an existing payment record for a specific company"""
+    logger.info("Updating company payment", company_id=company_id, payment_id=payment_id)
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for payment update", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Check if payment exists and belongs to the company
+        existing_payment = db_ops.payments.get_payment_by_id(payment_id)
+        if not existing_payment:
+            logger.warning("Payment not found for update", company_id=company_id, payment_id=payment_id)
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        if existing_payment.company_id != company_id:
+            logger.warning(
+                "Payment does not belong to company",
+                company_id=company_id,
+                payment_id=payment_id,
+                payment_company_id=existing_payment.company_id,
+            )
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        # Validate payment amount is positive if being updated
+        if payment_update.amount is not None and payment_update.amount <= 0:
+            logger.warning("Invalid payment amount", payment_amount=payment_update.amount)
+            raise HTTPException(status_code=400, detail="Payment amount must be positive")
+
+        # Update payment
+        updated_payment = db_ops.payments.update_payment(
+            payment_id=payment_id,
+            amount=payment_update.amount,
+            payment_date=payment_update.payment_date,
+            customer_id=payment_update.customer_id,
+            cohort_month=payment_update.cohort_month,
+        )
+
+        if not updated_payment:
+            logger.error("Failed to update company payment", company_id=company_id, payment_id=payment_id)
+            raise HTTPException(status_code=500, detail="Failed to update payment")
+
+        return PaymentResponse.from_db(updated_payment)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update company payment", company_id=company_id, payment_id=payment_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to update payment")
+
+
+@app.delete("/companies/{company_id}/payments/{payment_id}", tags=["Payments"])
+async def delete_company_payment(
+    company_id: int, payment_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)
+):
+    """Delete a payment record for a specific company"""
+    logger.info("Deleting company payment", company_id=company_id, payment_id=payment_id)
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for payment deletion", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Check if payment exists and belongs to the company
+        existing_payment = db_ops.payments.get_payment_by_id(payment_id)
+        if not existing_payment:
+            logger.warning("Payment not found for deletion", company_id=company_id, payment_id=payment_id)
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        if existing_payment.company_id != company_id:
+            logger.warning(
+                "Payment does not belong to company",
+                company_id=company_id,
+                payment_id=payment_id,
+                payment_company_id=existing_payment.company_id,
+            )
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        # Delete payment
+        success = db_ops.payments.delete_payment(payment_id)
+
+        if not success:
+            logger.error("Failed to delete company payment", company_id=company_id, payment_id=payment_id)
+            raise HTTPException(status_code=500, detail="Failed to delete payment")
+
+        logger.info("Payment deleted successfully", company_id=company_id, payment_id=payment_id)
+        return {"message": "Payment deleted successfully", "payment_id": payment_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to delete company payment", company_id=company_id, payment_id=payment_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to delete payment")
+
+
 # Threshold endpoints
-@app.post("/companies/{company_id}/thresholds/", response_model=ThresholdResponse, tags = ["Thresholds"])
+@app.post("/companies/{company_id}/thresholds/", response_model=ThresholdResponse, tags=["Thresholds"])
 async def create_threshold(
     company_id: int, threshold: ThresholdCreate, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
@@ -205,58 +345,11 @@ async def create_threshold(
     return ThresholdResponse.from_db(db_threshold)
 
 
-@app.get("/companies/{company_id}/thresholds/", response_model=List[ThresholdResponse], tags = ["Thresholds"])
+@app.get("/companies/{company_id}/thresholds/", response_model=List[ThresholdResponse], tags=["Thresholds"])
 async def list_thresholds(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
     db_thresholds = db_ops.thresholds.list_thresholds_by_company(company_id)
     return [ThresholdResponse.from_db(threshold) for threshold in db_thresholds]
 
-
-@app.get("/companies/{company_id}/cashflows")
-async def get_cashflows(
-    company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)
-) -> Dict[str, Any]:
-    """Get cashflow data with cohort trading details"""
-    logger.info("Getting cashflows", company_id=company_id)
-
-    try:
-        trades = db_ops.trades.list_trades_by_company(company_id)
-
-        cashflows = []
-        for trade in trades:
-            # Simplified cashflow calculation - could be enhanced with real calculations
-            periods = []
-            cumulative = 0.0
-
-            for i in range(12):  # Show 12 periods
-                period_data = {
-                    "period": i,
-                    "payment": 0.0,
-                    "share_applied": trade.sharing_percentage,
-                    "collected": 0.0,
-                    "cumulative": cumulative,
-                    "status": "Active",
-                    "threshold_failed": False,
-                    "capped": cumulative >= trade.cash_cap,
-                }
-                periods.append(period_data)
-
-            trade_data = {
-                "cohort_id": trade.id,
-                "cohort_month": trade.cohort_month.strftime("%Y-%m"),
-                "sharing_percentage": trade.sharing_percentage,
-                "cash_cap": trade.cash_cap,
-                "cumulative_collected": cumulative,
-                "periods": periods,
-            }
-            cashflows.append(trade_data)
-
-        logger.info("Cashflows generated", company_id=company_id, trade_count=len(cashflows))
-
-        return {"trades": cashflows}
-
-    except Exception as e:
-        logger.error("Error generating cashflows", company_id=company_id, error=str(e))
-        return {"cohorts": []}
 
 @app.get("/companies/{company_id}/spends/", response_model=List[SpendResponse], tags=["Spends"])
 async def list_company_spends(
@@ -265,16 +358,16 @@ async def list_company_spends(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
     include_company: bool = False,
-    db_ops: DatabaseOperations = Depends(get_db_operations)
+    db_ops: DatabaseOperations = Depends(get_db_operations),
 ):
     """Get all spend records for a specific company"""
     logger.info(
-        "Listing company spends", 
-        company_id=company_id, 
+        "Listing company spends",
+        company_id=company_id,
         cohort_month=cohort_month,
         limit=limit,
         offset=offset,
-        include_company=include_company
+        include_company=include_company,
     )
 
     try:
@@ -294,10 +387,7 @@ async def list_company_spends(
 
         # Get spends for the company
         db_spends = db_ops.spends.list_spends_by_company(
-            company_id=company_id,
-            cohort_month=cohort_date,
-            limit=limit,
-            offset=offset
+            company_id=company_id, cohort_month=cohort_date, limit=limit, offset=offset
         )
 
         # Convert to response models
@@ -307,9 +397,10 @@ async def list_company_spends(
                 # Load company relationship if requested
                 from sqlalchemy.orm import joinedload
                 from src.python.db.schemas import Spend
-                spend_with_company = (db_ops.db.query(Spend)
-                    .options(joinedload("company"))
-                    .filter(Spend.id == spend.id)).first()
+
+                spend_with_company = (
+                    db_ops.db.query(Spend).options(joinedload("company")).filter(Spend.id == spend.id)
+                ).first()
                 response_spends.append(SpendResponse.from_db(spend_with_company, include_company=True))
             else:
                 response_spends.append(SpendResponse.from_db(spend, include_company=False))
@@ -326,16 +417,11 @@ async def list_company_spends(
 
 @app.post("/companies/{company_id}/spends/", response_model=SpendResponse, tags=["Spends"])
 async def create_company_spend(
-    company_id: int,
-    spend: SpendCreate, 
-    db_ops: DatabaseOperations = Depends(get_db_operations)
+    company_id: int, spend: SpendCreate, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
     """Create a new spend record for a specific company"""
     logger.info(
-        "Creating company spend", 
-        company_id=company_id, 
-        cohort_month=spend.cohort_month, 
-        spend_amount=spend.spend
+        "Creating company spend", company_id=company_id, cohort_month=spend.cohort_month, spend_amount=spend.spend
     )
 
     try:
@@ -347,15 +433,8 @@ async def create_company_spend(
         # Check if spend already exists for this company and cohort month
         existing = db_ops.spends.get_spend_by_company_and_cohort(company_id, spend.cohort_month)
         if existing:
-            logger.warning(
-                "Spend already exists", 
-                company_id=company_id, 
-                cohort_month=spend.cohort_month
-            )
-            raise HTTPException(
-                status_code=400, 
-                detail="Spend for this company and cohort month already exists"
-            )
+            logger.warning("Spend already exists", company_id=company_id, cohort_month=spend.cohort_month)
+            raise HTTPException(status_code=400, detail="Spend for this company and cohort month already exists")
 
         # Validate spend amount is positive
         if spend.spend <= 0:
@@ -363,11 +442,7 @@ async def create_company_spend(
             raise HTTPException(status_code=400, detail="Spend amount must be positive")
 
         # Create spend
-        db_spend = db_ops.spends.create_spend(
-            company_id=company_id,
-            cohort_month=spend.cohort_month,
-            spend=spend.spend
-        )
+        db_spend = db_ops.spends.create_spend(company_id=company_id, cohort_month=spend.cohort_month, spend=spend.spend)
 
         return SpendResponse.from_db(db_spend)
 
@@ -381,9 +456,9 @@ async def create_company_spend(
 @app.get("/companies/{company_id}/spends/{spend_id}", response_model=SpendResponse, tags=["Spends"])
 async def get_company_spend(
     company_id: int,
-    spend_id: int, 
+    spend_id: int,
     include_company: bool = False,
-    db_ops: DatabaseOperations = Depends(get_db_operations)
+    db_ops: DatabaseOperations = Depends(get_db_operations),
 ):
     """Get specific spend by ID for a specific company"""
     logger.info("Getting company spend", company_id=company_id, spend_id=spend_id, include_company=include_company)
@@ -398,9 +473,13 @@ async def get_company_spend(
         if include_company:
             from sqlalchemy.orm import joinedload
             from src.python.db.schemas import Spend
-            spend = (db_ops.db.query(Spend)
-                    .options(joinedload("company"))
-                    .filter(Spend.id == spend_id, Spend.company_id == company_id).first())
+
+            spend = (
+                db_ops.db.query(Spend)
+                .options(joinedload("company"))
+                .filter(Spend.id == spend_id, Spend.company_id == company_id)
+                .first()
+            )
         else:
             spend = db_ops.spends.get_spend_by_id(spend_id)
 
@@ -410,7 +489,12 @@ async def get_company_spend(
 
         # Validate spend belongs to the company
         if spend.company_id != company_id:
-            logger.warning("Spend does not belong to company", company_id=company_id, spend_id=spend_id, spend_company_id=spend.company_id)
+            logger.warning(
+                "Spend does not belong to company",
+                company_id=company_id,
+                spend_id=spend_id,
+                spend_company_id=spend.company_id,
+            )
             raise HTTPException(status_code=404, detail="Spend not found")
 
         return SpendResponse.from_db(spend, include_company=include_company)
@@ -424,10 +508,7 @@ async def get_company_spend(
 
 @app.put("/companies/{company_id}/spends/{spend_id}", response_model=SpendResponse, tags=["Spends"])
 async def update_company_spend(
-    company_id: int,
-    spend_id: int,
-    spend_update: SpendUpdate,
-    db_ops: DatabaseOperations = Depends(get_db_operations)
+    company_id: int, spend_id: int, spend_update: SpendUpdate, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
     """Update an existing spend record for a specific company"""
     logger.info("Updating company spend", company_id=company_id, spend_id=spend_id)
@@ -445,12 +526,21 @@ async def update_company_spend(
             raise HTTPException(status_code=404, detail="Spend not found")
 
         if existing_spend.company_id != company_id:
-            logger.warning("Spend does not belong to company", company_id=company_id, spend_id=spend_id, spend_company_id=existing_spend.company_id)
+            logger.warning(
+                "Spend does not belong to company",
+                company_id=company_id,
+                spend_id=spend_id,
+                spend_company_id=existing_spend.company_id,
+            )
             raise HTTPException(status_code=404, detail="Spend not found")
 
         # Prevent changing company_id in company-scoped endpoint
         if spend_update.company_id is not None and spend_update.company_id != company_id:
-            logger.warning("Cannot change company_id in company-scoped endpoint", company_id=company_id, new_company_id=spend_update.company_id)
+            logger.warning(
+                "Cannot change company_id in company-scoped endpoint",
+                company_id=company_id,
+                new_company_id=spend_update.company_id,
+            )
             raise HTTPException(status_code=400, detail="Cannot change company_id for spend in company-scoped endpoint")
 
         # Check for duplicate if cohort_month is being updated
@@ -460,12 +550,9 @@ async def update_company_spend(
                 logger.warning(
                     "Spend already exists for updated cohort month",
                     company_id=company_id,
-                    cohort_month=spend_update.cohort_month
+                    cohort_month=spend_update.cohort_month,
                 )
-                raise HTTPException(
-                    status_code=400,
-                    detail="Spend for this company and cohort month already exists"
-                )
+                raise HTTPException(status_code=400, detail="Spend for this company and cohort month already exists")
 
         # Validate spend amount is positive if being updated
         if spend_update.spend is not None and spend_update.spend <= 0:
@@ -477,7 +564,7 @@ async def update_company_spend(
             spend_id=spend_id,
             company_id=None,  # Keep original company_id
             cohort_month=spend_update.cohort_month,
-            spend=spend_update.spend
+            spend=spend_update.spend,
         )
 
         if not updated_spend:
@@ -493,11 +580,37 @@ async def update_company_spend(
         raise HTTPException(status_code=500, detail="Failed to update spend")
 
 
+@app.get("/companies/{company_id}/cashflows")
+async def get_cashflows(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)) -> CashflowResponse:
+    """Get cashflow data with cohort trading details"""
+    logger.info("Getting cashflows", company_id=company_id)
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for payment deletion", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        trades = db_ops.trades.list_trades_by_company(company_id)
+        payments = db_ops.payments.list_payments_by_company(company_id)
+        spends = db_ops.spends.list_spends_by_company(company_id)
+        thresholds = db_ops.thresholds.list_thresholds_by_company(company_id)
+        cohorts = compute_company_cohort_cashflows(
+            company_id=company_id, trades=trades, payments=payments, spends=spends, thresholds=thresholds
+        )
+
+        logger.info("Cashflows generated", company_id=company_id)
+
+        return CashflowResponse(cohorts=cohorts)
+
+    except Exception as e:
+        logger.error("Error generating cashflows", company_id=company_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Error generating cashflows")
+
+
 # Analytics endpoints
 @app.get("/companies/{company_id}/metrics", tags=["Analytics"])
-async def get_metrics(
-    company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)
-) -> MetricsResponse:
+async def get_metrics(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)) -> MetricsResponse:
     """Get company metrics for a specific month"""
     logger.info("Getting metrics", company_id=company_id)
 
@@ -564,7 +677,8 @@ async def get_metrics(
             ltv_estimate=0.0,
             cac_estimate=0.0,
         )
-    
+
+
 @app.get("/companies/{company_id}/cohorts_table")
 async def get_cohorts_table(
     company_id: int, include_predicted: bool = True, db_ops: DatabaseOperations = Depends(get_db_operations)
@@ -573,30 +687,16 @@ async def get_cohorts_table(
     logger.info("Getting cohorts table", company_id=company_id, include_predicted=include_predicted)
 
     try:
-        # Get payments data
-        payments_df = db_ops.payments.get_payments_dataframe(company_id)
-        if payments_df.empty:
-            logger.warning("No payments found for cohorts table", company_id=company_id)
-            return {"columns": [], "rows": []}
+        trades = db_ops.trades.list_trades_by_company(company_id)
+        payments = db_ops.payments.list_payments_by_company(company_id)
+        spends = db_ops.spends.list_spends_by_company(company_id)
+        thresholds = db_ops.thresholds.list_thresholds_by_company(company_id)
+        cohorts = compute_company_cohort_cashflows(
+            company_id=company_id, trades=trades, payments=payments, spends=spends, thresholds=thresholds
+        )
+        df = cohorts_to_cvf_cashflows_df(cohorts)
 
-        # Convert to cohort matrix
-        cohort_df = payment_df_to_cohort_df(payments_df)
-
-        # Format for frontend
-        columns = [f"payment_period_{i}" for i in range(len(cohort_df.columns))]
-        rows = []
-
-        for cohort_month, row in cohort_df.iterrows():
-            actual_values = [float(val) if pd.notna(val) else 0.0 for val in row.values]
-            predicted_values = actual_values.copy()  # Simplified - add prediction logic
-
-            rows.append(
-                {"cohort_month": cohort_month.strftime("%Y-%m"), "actual": actual_values, "predicted": predicted_values}
-            )
-
-        logger.info("Cohort table generated", company_id=company_id, cohort_count=len(rows), period_count=len(columns))
-
-        return {"columns": columns, "rows": rows}
+        return {"df": df}
 
     except Exception as e:
         logger.error("Error generating cohorts table", company_id=company_id, error=str(e))

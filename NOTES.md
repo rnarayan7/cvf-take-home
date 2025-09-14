@@ -1,0 +1,1 @@
+Every time a new payment is uploaded, if the customer already exists, then we need to go see what it's first payment date was.

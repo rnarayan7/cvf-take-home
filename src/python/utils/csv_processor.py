@@ -107,6 +107,7 @@ class CSVProcessor:
         self.logger.info("Processing payments CSV", company_id=company_id, row_count=len(df))
 
         from src.python.db.db_operations import DatabaseOperations
+
         db_ops = DatabaseOperations(db)
 
         # Validate company exists
