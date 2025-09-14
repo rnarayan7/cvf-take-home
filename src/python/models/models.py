@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional
 from datetime import date, datetime
 import src.python.db.schemas as db_schemas
 
@@ -194,6 +194,7 @@ class Cohort(BaseModel):
     periods: List[Period]
     customers: List[str]
     cumulative_payment: float
+    funded: bool = False
 
 
 class FundedCohort(Cohort):
@@ -203,6 +204,7 @@ class FundedCohort(Cohort):
     cumulative_collected: float
     periods: List[FundedPeriod]
     capped: bool
+    funded: bool = True
 
 
 class Period(BaseModel):
@@ -213,7 +215,7 @@ class Period(BaseModel):
 
 
 class FundedPeriod(Period):
-    theshold_payment_percentage: Optional[float] = Field(float)
+    theshold_payment_percentage: Optional[float] = None
     threshold_failed: bool
     share_applied: float
     collected: float
@@ -226,8 +228,7 @@ class PredictedFundedPeriod(FundedPeriod):
 
 
 class CashflowResponse(BaseModel):
-    cohorts: List[Cohort | FundedCohort]
-
+    cohorts: List[FundedCohort | Cohort]
 
 # Customer schemas
 class CustomerBase(BaseModel):
