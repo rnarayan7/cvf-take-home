@@ -1,26 +1,10 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import pandas as pd
-from typing import List, Dict, Any, Optional
-from datetime import date, datetime
+from typing import List, Optional
+from datetime import datetime
 import structlog
-
 from src.python.utils.calc import compute_company_cohort_cashflows, cohorts_to_cvf_cashflows_df
-from src.python.models.models import (
-    CompanyCreate,
-    CompanyResponse,
-    TradeCreate,
-    TradeResponse,
-    PaymentResponse,
-    PaymentUpdate,
-    ThresholdCreate,
-    ThresholdResponse,
-    SpendCreate,
-    SpendUpdate,
-    SpendResponse,
-    MetricsResponse,
-    CashflowResponse,
-)
+import src.python.models.models as models
 from src.python.utils.csv_processor import get_payments_csv_processor
 from src.python.db.db_operations import get_db_operations, DatabaseOperations
 
@@ -85,8 +69,8 @@ async def health_check():
 
 
 # Company endpoints
-@app.post("/companies/", response_model=CompanyResponse, tags=["Companies"])
-async def create_company(company: CompanyCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
+@app.post("/companies/", response_model=models.CompanyResponse, tags=["Companies"])
+async def create_company(company: models.CompanyCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """Create a new company"""
     logger.info("Creating company", name=company.name)
 
@@ -98,21 +82,21 @@ async def create_company(company: CompanyCreate, db_ops: DatabaseOperations = De
 
     try:
         db_company = db_ops.companies.create_company(company.name)
-        return CompanyResponse.from_db(db_company)
+        return models.CompanyResponse.from_db(db_company)
     except Exception as e:
         logger.error("Failed to create company", name=company.name, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to create company")
 
 
-@app.get("/companies/", response_model=List[CompanyResponse], tags=["Companies"])
+@app.get("/companies/", response_model=List[models.CompanyResponse], tags=["Companies"])
 async def list_companies(db_ops: DatabaseOperations = Depends(get_db_operations)):
     """List all companies"""
     logger.info("Listing companies")
     db_companies = db_ops.companies.list_companies()
-    return [CompanyResponse.from_db(company) for company in db_companies]
+    return [models.CompanyResponse.from_db(company) for company in db_companies]
 
 
-@app.get("/companies/{company_id}", response_model=CompanyResponse, tags=["Companies"])
+@app.get("/companies/{company_id}", response_model=models.CompanyResponse, tags=["Companies"])
 async def get_company(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """Get company by ID"""
     logger.info("Getting company", company_id=company_id)
@@ -120,12 +104,12 @@ async def get_company(company_id: int, db_ops: DatabaseOperations = Depends(get_
     if not company:
         logger.warning("Company not found", company_id=company_id)
         raise HTTPException(status_code=404, detail="Company not found")
-    return CompanyResponse.from_db(company)
+    return models.CompanyResponse.from_db(company)
 
 
 # Trade endpoints
-@app.post("/companies/{company_id}/trades/", response_model=TradeResponse, tags=["Trades"])
-async def create_trade(company_id: int, trade: TradeCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
+@app.post("/companies/{company_id}/trades/", response_model=models.TradeResponse, tags=["Trades"])
+async def create_trade(company_id: int, trade: models.TradeCreate, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """Create a new trade (trading terms) for a company cohort"""
     logger.info("Creating trade", company_id=company_id, cohort_month=trade.cohort_month)
 
@@ -142,13 +126,13 @@ async def create_trade(company_id: int, trade: TradeCreate, db_ops: DatabaseOper
 
     try:
         db_trade = db_ops.trades.create_trade(company_id, trade.cohort_month, trade.sharing_percentage, trade.cash_cap)
-        return TradeResponse.from_db(db_trade)
+        return models.TradeResponse.from_db(db_trade)
     except Exception as e:
         logger.error("Failed to create trade", company_id=company_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to create trade")
 
 
-@app.get("/companies/{company_id}/trades/", response_model=List[TradeResponse], tags=["Trades"])
+@app.get("/companies/{company_id}/trades/", response_model=List[models.TradeResponse], tags=["Trades"])
 async def list_trades(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """List all trades for a company"""
     logger.info("Listing trades", company_id=company_id)
@@ -159,7 +143,7 @@ async def list_trades(company_id: int, db_ops: DatabaseOperations = Depends(get_
         raise HTTPException(status_code=404, detail="Company not found")
 
     db_trades = db_ops.trades.list_trades_by_company(company_id)
-    return [TradeResponse.from_db(trade) for trade in db_trades]
+    return [models.TradeResponse.from_db(trade) for trade in db_trades]
 
 
 # Payment endpoints
@@ -178,7 +162,7 @@ async def upload_payments(
     return result
 
 
-@app.get("/companies/{company_id}/payments/", response_model=List[PaymentResponse], tags=["Payments"])
+@app.get("/companies/{company_id}/payments/", response_model=List[models.PaymentResponse], tags=["Payments"])
 async def list_payments(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
     """List all payments for a company"""
     logger.info("Listing payments", company_id=company_id)
@@ -189,10 +173,10 @@ async def list_payments(company_id: int, db_ops: DatabaseOperations = Depends(ge
         raise HTTPException(status_code=404, detail="Company not found")
 
     db_payments = db_ops.payments.list_payments_by_company(company_id)
-    return [PaymentResponse.from_db(payment) for payment in db_payments]
+    return [models.PaymentResponse.from_db(payment) for payment in db_payments]
 
 
-@app.get("/companies/{company_id}/payments/{payment_id}", response_model=PaymentResponse, tags=["Payments"])
+@app.get("/companies/{company_id}/payments/{payment_id}", response_model=models.PaymentResponse, tags=["Payments"])
 async def get_company_payment(
     company_id: int, payment_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
@@ -222,7 +206,7 @@ async def get_company_payment(
             )
             raise HTTPException(status_code=404, detail="Payment not found")
 
-        return PaymentResponse.from_db(payment)
+        return models.PaymentResponse.from_db(payment)
 
     except HTTPException:
         raise
@@ -231,11 +215,11 @@ async def get_company_payment(
         raise HTTPException(status_code=500, detail="Failed to get payment")
 
 
-@app.put("/companies/{company_id}/payments/{payment_id}", response_model=PaymentResponse, tags=["Payments"])
+@app.put("/companies/{company_id}/payments/{payment_id}", response_model=models.PaymentResponse, tags=["Payments"])
 async def update_company_payment(
     company_id: int,
     payment_id: int,
-    payment_update: PaymentUpdate,
+    payment_update: models.PaymentUpdate,
     db_ops: DatabaseOperations = Depends(get_db_operations),
 ):
     """Update an existing payment record for a specific company"""
@@ -280,7 +264,7 @@ async def update_company_payment(
             logger.error("Failed to update company payment", company_id=company_id, payment_id=payment_id)
             raise HTTPException(status_code=500, detail="Failed to update payment")
 
-        return PaymentResponse.from_db(updated_payment)
+        return models.PaymentResponse.from_db(updated_payment)
 
     except HTTPException:
         raise
@@ -335,23 +319,23 @@ async def delete_company_payment(
 
 
 # Threshold endpoints
-@app.post("/companies/{company_id}/thresholds/", response_model=ThresholdResponse, tags=["Thresholds"])
+@app.post("/companies/{company_id}/thresholds/", response_model=models.ThresholdResponse, tags=["Thresholds"])
 async def create_threshold(
-    company_id: int, threshold: ThresholdCreate, db_ops: DatabaseOperations = Depends(get_db_operations)
+    company_id: int, threshold: models.ThresholdCreate, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
     db_threshold = db_ops.thresholds.create_threshold(
         company_id, threshold.payment_period_month, threshold.minimum_payment_percent
     )
-    return ThresholdResponse.from_db(db_threshold)
+    return models.ThresholdResponse.from_db(db_threshold)
 
 
-@app.get("/companies/{company_id}/thresholds/", response_model=List[ThresholdResponse], tags=["Thresholds"])
+@app.get("/companies/{company_id}/thresholds/", response_model=List[models.ThresholdResponse], tags=["Thresholds"])
 async def list_thresholds(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)):
     db_thresholds = db_ops.thresholds.list_thresholds_by_company(company_id)
-    return [ThresholdResponse.from_db(threshold) for threshold in db_thresholds]
+    return [models.ThresholdResponse.from_db(threshold) for threshold in db_thresholds]
 
 
-@app.get("/companies/{company_id}/spends/", response_model=List[SpendResponse], tags=["Spends"])
+@app.get("/companies/{company_id}/spends/", response_model=List[models.SpendResponse], tags=["Spends"])
 async def list_company_spends(
     company_id: int,
     cohort_month: Optional[str] = None,
@@ -401,9 +385,9 @@ async def list_company_spends(
                 spend_with_company = (
                     db_ops.db.query(Spend).options(joinedload("company")).filter(Spend.id == spend.id)
                 ).first()
-                response_spends.append(SpendResponse.from_db(spend_with_company, include_company=True))
+                response_spends.append(models.SpendResponse.from_db(spend_with_company, include_company=True))
             else:
-                response_spends.append(SpendResponse.from_db(spend, include_company=False))
+                response_spends.append(models.SpendResponse.from_db(spend, include_company=False))
 
         logger.info("Company spends listed", company_id=company_id, count=len(response_spends))
         return response_spends
@@ -415,9 +399,9 @@ async def list_company_spends(
         raise HTTPException(status_code=500, detail="Failed to list company spends")
 
 
-@app.post("/companies/{company_id}/spends/", response_model=SpendResponse, tags=["Spends"])
+@app.post("/companies/{company_id}/spends/", response_model=models.SpendResponse, tags=["Spends"])
 async def create_company_spend(
-    company_id: int, spend: SpendCreate, db_ops: DatabaseOperations = Depends(get_db_operations)
+    company_id: int, spend: models.SpendCreate, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
     """Create a new spend record for a specific company"""
     logger.info(
@@ -444,7 +428,7 @@ async def create_company_spend(
         # Create spend
         db_spend = db_ops.spends.create_spend(company_id=company_id, cohort_month=spend.cohort_month, spend=spend.spend)
 
-        return SpendResponse.from_db(db_spend)
+        return models.SpendResponse.from_db(db_spend)
 
     except HTTPException:
         raise
@@ -453,7 +437,7 @@ async def create_company_spend(
         raise HTTPException(status_code=500, detail="Failed to create spend")
 
 
-@app.get("/companies/{company_id}/spends/{spend_id}", response_model=SpendResponse, tags=["Spends"])
+@app.get("/companies/{company_id}/spends/{spend_id}", response_model=models.SpendResponse, tags=["Spends"])
 async def get_company_spend(
     company_id: int,
     spend_id: int,
@@ -497,7 +481,7 @@ async def get_company_spend(
             )
             raise HTTPException(status_code=404, detail="Spend not found")
 
-        return SpendResponse.from_db(spend, include_company=include_company)
+        return models.SpendResponse.from_db(spend, include_company=include_company)
 
     except HTTPException:
         raise
@@ -506,9 +490,9 @@ async def get_company_spend(
         raise HTTPException(status_code=500, detail="Failed to get spend")
 
 
-@app.put("/companies/{company_id}/spends/{spend_id}", response_model=SpendResponse, tags=["Spends"])
+@app.put("/companies/{company_id}/spends/{spend_id}", response_model=models.SpendResponse, tags=["Spends"])
 async def update_company_spend(
-    company_id: int, spend_id: int, spend_update: SpendUpdate, db_ops: DatabaseOperations = Depends(get_db_operations)
+    company_id: int, spend_id: int, spend_update: models.SpendUpdate, db_ops: DatabaseOperations = Depends(get_db_operations)
 ):
     """Update an existing spend record for a specific company"""
     logger.info("Updating company spend", company_id=company_id, spend_id=spend_id)
@@ -571,7 +555,7 @@ async def update_company_spend(
             logger.error("Failed to update company spend", company_id=company_id, spend_id=spend_id)
             raise HTTPException(status_code=500, detail="Failed to update spend")
 
-        return SpendResponse.from_db(updated_spend)
+        return models.SpendResponse.from_db(updated_spend)
 
     except HTTPException:
         raise
@@ -581,7 +565,7 @@ async def update_company_spend(
 
 
 @app.get("/companies/{company_id}/cashflows")
-async def get_cashflows(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)) -> CashflowResponse:
+async def get_cashflows(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)) -> models.CashflowResponse:
     """Get cashflow data with cohort trading details"""
     logger.info("Getting cashflows", company_id=company_id)
 
@@ -598,10 +582,8 @@ async def get_cashflows(company_id: int, db_ops: DatabaseOperations = Depends(ge
         cohorts = compute_company_cohort_cashflows(
             company_id=company_id, trades=trades, payments=payments, spends=spends, thresholds=thresholds
         )
-
         logger.info("Cashflows generated", company_id=company_id)
-
-        return CashflowResponse(cohorts=cohorts)
+        return models.CashflowResponse(cohorts=cohorts)
 
     except Exception as e:
         logger.error("Error generating cashflows", company_id=company_id, error=str(e))
@@ -610,7 +592,7 @@ async def get_cashflows(company_id: int, db_ops: DatabaseOperations = Depends(ge
 
 # Analytics endpoints
 @app.get("/companies/{company_id}/metrics", tags=["Analytics"])
-async def get_metrics(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)) -> MetricsResponse:
+async def get_metrics(company_id: int, db_ops: DatabaseOperations = Depends(get_db_operations)) -> models.MetricsResponse:
     """Get company metrics for a specific month"""
     logger.info("Getting metrics", company_id=company_id)
 
@@ -620,7 +602,7 @@ async def get_metrics(company_id: int, db_ops: DatabaseOperations = Depends(get_
 
         if data["payments_df"].empty:
             logger.warning("No payments data found", company_id=company_id)
-            return MetricsResponse(
+            return models.MetricsResponse(
                 owed_this_month=0.0,
                 breaches_count=0,
                 moic_to_date=0.0,
@@ -633,7 +615,7 @@ async def get_metrics(company_id: int, db_ops: DatabaseOperations = Depends(get_
 
         if data["spend_df"].empty:
             logger.warning("No spend data found", company_id=company_id)
-            return MetricsResponse(
+            return models.MetricsResponse(
                 owed_this_month=0.0,
                 breaches_count=0,
                 moic_to_date=0.0,
@@ -660,7 +642,7 @@ async def get_metrics(company_id: int, db_ops: DatabaseOperations = Depends(get_
             "Metrics calculated", company_id=company_id, moic=moic, ltv_estimate=ltv_estimate, cac_estimate=cac_estimate
         )
 
-        return MetricsResponse(
+        return models.MetricsResponse(
             owed_this_month=total_owed,
             breaches_count=0,  # Calculate based on thresholds
             moic_to_date=moic,
@@ -670,7 +652,7 @@ async def get_metrics(company_id: int, db_ops: DatabaseOperations = Depends(get_
 
     except Exception as e:
         logger.error("Error calculating metrics", company_id=company_id, error=str(e))
-        return MetricsResponse(
+        return models.MetricsResponse(
             owed_this_month=0.0,
             breaches_count=0,
             moic_to_date=0.0,

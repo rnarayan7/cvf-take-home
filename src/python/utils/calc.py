@@ -7,8 +7,8 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional
 from collections import defaultdict
-from src.python.db.schemas import Trade, Payment, Spend, Threshold, Date
-from src.python.models.models import CashflowResponse, Cohort, FundedCohort, Period, FundedPeriod
+from src.python.db.schemas import Trade, Payment, Spend, Threshold
+from src.python.models.models import Cohort, FundedCohort, Period, FundedPeriod, CashflowResponse
 from dataclasses import dataclass, field
 
 
@@ -22,7 +22,7 @@ def _aggregate_payments_by_month(payments: List[Payment]) -> Dict:
 
 def compute_company_cohort_cashflows(
     company_id: str, trades: List[Trade], payments: List[Payment], spends: List[Spend], thresholds: List[Threshold]
-) -> List[Cohort | FundedCohort]:
+) -> List[FundedCohort | Cohort]:
     
     @dataclass
     class ConsolidatedCohort:
@@ -36,7 +36,7 @@ def compute_company_cohort_cashflows(
     for p in payments:
         consolidated[p.cohort_month].payments.append(p)
 
-    cohorts: List[Cohort | FundedCohort] = []
+    cohorts: List[FundedCohort | Cohort] = []
     for cohort_month, ch in consolidated.items():
         payments_by_month = _aggregate_payments_by_month(payments=ch.payments)
         thresholds_by_period_num = {th.payment_period_month: th for th in thresholds}
@@ -117,11 +117,10 @@ def compute_company_cohort_cashflows(
                     cumulative_payment=cumulative_payment,
                 )
             )
-
     return cohorts
 
 
-def cohorts_to_cvf_cashflows_df(cohorts: List[Cohort | FundedCohort]) -> pd.DataFrame:
+def cohorts_to_cvf_cashflows_df(cashflows: CashflowResponse) -> pd.DataFrame:
     """
     Convert the output of compute_company_cohort_cashflows to CVF cashflows DataFrame format
     matching the structure from the take_home.ipynb notebook.
@@ -132,6 +131,7 @@ def cohorts_to_cvf_cashflows_df(cohorts: List[Cohort | FundedCohort]) -> pd.Data
     Returns:
         DataFrame with cohort dates as index, monthly periods as columns, and CVF collections as values
     """
+    # TODO, fix this now that the input is
     if not cohorts:
         return pd.DataFrame()
     
