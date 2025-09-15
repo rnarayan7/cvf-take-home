@@ -400,21 +400,10 @@ async def update_threshold(
 @app.get("/companies/{company_id}/spends/", response_model=List[models.SpendResponse], tags=["Spends"])
 async def list_company_spends(
     company_id: int,
-    cohort_month: Optional[str] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    include_company: bool = False,
     db_ops: DatabaseOperations = Depends(get_db_operations),
-):
+) -> List[models.SpendResponse]:
     """Get all spend records for a specific company"""
-    logger.info(
-        "Listing company spends",
-        company_id=company_id,
-        cohort_month=cohort_month,
-        limit=limit,
-        offset=offset,
-        include_company=include_company,
-    )
+    logger.info("Listing company spends", company_id=company_id)
 
     try:
         # Validate company exists
@@ -422,37 +411,11 @@ async def list_company_spends(
             logger.warning("Company not found for spend listing", company_id=company_id)
             raise HTTPException(status_code=404, detail="Company not found")
 
-        # Parse cohort_month if provided
-        cohort_date = None
-        if cohort_month:
-            try:
-                cohort_date = datetime.strptime(cohort_month, "%Y-%m").date()
-            except ValueError:
-                logger.warning("Invalid cohort_month format", cohort_month=cohort_month)
-                raise HTTPException(status_code=400, detail="Invalid cohort_month format. Use YYYY-MM")
+        # Get all spends for the company
+        db_spends = db_ops.spends.list_spends_by_company(company_id=company_id)
 
-        # Get spends for the company
-        db_spends = db_ops.spends.list_spends_by_company(
-            company_id=company_id, cohort_month=cohort_date, limit=limit, offset=offset
-        )
-
-        # Convert to response models
-        response_spends = []
-        for spend in db_spends:
-            if include_company:
-                # Load company relationship if requested
-                from sqlalchemy.orm import joinedload
-                from src.python.db.schemas import Spend
-
-                spend_with_company = (
-                    db_ops.db.query(Spend).options(joinedload("company")).filter(Spend.id == spend.id)
-                ).first()
-                response_spends.append(models.SpendResponse.from_db(spend_with_company, include_company=True))
-            else:
-                response_spends.append(models.SpendResponse.from_db(spend, include_company=False))
-
-        logger.info("Company spends listed", company_id=company_id, count=len(response_spends))
-        return response_spends
+        logger.info("Company spends listed", company_id=company_id, count=len(db_spends))
+        return [models.SpendResponse.from_db(s) for s in db_spends]
 
     except HTTPException:
         raise
