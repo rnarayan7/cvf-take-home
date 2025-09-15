@@ -312,7 +312,7 @@ SEED_DATA_BY_COHORT_MONTH = {
                     {"customer_id": "growth_014", "payment_date": date(2024, 5, 18), "amount": 95000},
                     {"customer_id": "growth_014", "payment_date": date(2024, 5, 19), "amount": 95000},
                     {"customer_id": "growth_014", "payment_date": date(2024, 5, 12), "amount": 95000},
-                    {"customer_id": "growth_014", "payment_date": date(2024, 5, 32), "amount": 95000},
+                    {"customer_id": "growth_014", "payment_date": date(2024, 5, 13), "amount": 95000},
                 ]},
         },
     },
