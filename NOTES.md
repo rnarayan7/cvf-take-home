@@ -19,3 +19,16 @@ Pages:
   - List payments - provide edit function
   - List spends - provide edit function
   - Export to CSV, includes tabs for payments, spends, and cashflows
+
+Metrics:
+
+For Portco:
+- Total invested by GC
+- Total paid back to GC
+- Number of thresholds failed
+- Percentage of threshold failures
+- Average duration before fulfilling repayment
+- Average GC collection percentage
+
+For GC:
+- IRR
