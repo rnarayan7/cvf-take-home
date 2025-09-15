@@ -24,18 +24,16 @@ def _aggregate_payments_by_month(payments: List[Payment]) -> Dict:
         payments_by_month[month_key].append(p)
     return payments_by_month
 
-def _calculate_funded_cohort_irr(spend: float, periods: List[FundedPeriod]) -> Optional[float]:                                                        
+def _calculate_funded_cohort_irr(spend: float, periods: List[FundedPeriod | PredictedFundedPeriod]) -> Optional[float]:                                                        
     """Calculate IRR for a funded cohort using collected amounts"""                                                                                   
-    # Start with negative spend (initial investment)
     cash_flows = [-spend]
-    # Use collected amount (what CVF actually received) for each period
-    cash_flows += [p.collected for p in periods]
+    cash_flows += [p.payment for p in periods]
     monthly_irr = npf.irr(cash_flows)
     annual_irr = (1 + monthly_irr) ** 12 - 1
     return annual_irr
 
 def _is_predicted_period(period_num: int, payments_by_month: Dict, churn: Optional[float]) -> bool:
-    return False if churn is None else period_num >= len(payments_by_month)
+    return False if churn is None else period_num >= len(payments_by_month)-1
 
 def _compute_prediction_for_period(periods : List[FundedPeriod | PredictedFundedPeriod], churn : float) -> Decimal:
     return Decimal(periods[-1].payment * (1-churn))
@@ -74,7 +72,8 @@ def compute_company_cohort_cashflows(
         for period_num in range(num_periods):
 
             payment_sum: Optional[float] = None
-            if not _is_predicted_period(period_num, payments_by_month, churn):
+            predicted = _is_predicted_period(period_num, payments_by_month, churn)
+            if not predicted:
                 payment_period_month = list(payments_by_month.keys())[period_num]
                 payments = payments_by_month[payment_period_month]
                 payment_sum = sum([p.amount for p in payments])
@@ -98,7 +97,7 @@ def compute_company_cohort_cashflows(
                 period_capped = collected == ch.trade.cash_cap
                 capped = True if period_capped else capped
 
-                period_type = PredictedFundedPeriod if _is_predicted_period(period_num, payments_by_month, churn) else FundedPeriod
+                period_type = PredictedFundedPeriod if predicted else FundedPeriod
                 periods.append(
                     period_type(
                         period=period_num,
@@ -114,6 +113,8 @@ def compute_company_cohort_cashflows(
                         capped=period_capped,
                     )
                 )
+                if _is_predicted_period(period_num, payments_by_month, churn) and capped:
+                    break
 
             else:
                 periods.append(
