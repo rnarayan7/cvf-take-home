@@ -647,10 +647,3 @@ async def get_predicted_cashflows(
     except Exception as e:
         logger.error("Error generating predicted cashflows", company_id=company_id, error=str(e))
         raise HTTPException(status_code=500, detail="Error generating predicted cashflows")
-
-
-# Add MCP
-from fastmcp import FastMCP
-mcp = FastMCP.from_fastapi(app=app, name="CVF MCP")
-mcp_app = mcp.http_app(path='/mcp')
-app.mount("/llm", mcp_app)
