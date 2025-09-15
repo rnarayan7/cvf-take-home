@@ -708,7 +708,16 @@ It consisted of the following agents:
 ### Lovable
 I used Lovable extensively to mock up the UI initially. I found it had certain strengths and weaknesses compared to Claude Code, which I'm happy to discuss my views on further.
 
+### OnRender
+Used OnRender to deploy the client as a static hosted service and the server as a hosted web service.
+
 ---
+## Takeaways
+
+- Possibly could have used Retool instead. React has so many issues and my skills aren't in frontend. Nevertheless, it was fun to prototype the interactive graph representations of the data.
+- AI has a good amount of way to go before it replaces people. It is good at building things on top of good principles, but if you don't absolutely nail how you want your business logic to work the first time, more often than not it will be a net drag on your time trying to go rip out those bugs.
+- AI is simultaneously very impressive. I think the biggest value as a developer is it introducing you to best-in-class tools that you wouldn't be aware of. There's a lot of it that is overdone, which boils down to developer judgment. There is so much extra stuff that I could have added because by strength isn't in web programming, so it took some focus to deliberately say no to adding a lot of stuff.
+- Deployment tooling has gotten better over the years. I was pretty satisfied with OnRender for a quick deployment and it correctly picked up on a lot of build stuff that it needed to implement for the deployments to work successfully.
 
 ## Summary
 
