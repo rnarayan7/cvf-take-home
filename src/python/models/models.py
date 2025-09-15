@@ -207,9 +207,10 @@ class FundedCohort(Cohort):
     sharing_percentage: float
     cash_cap: float
     cumulative_collected: float
-    periods: List[FundedPeriod]
+    periods: List[FundedPeriod | PredictedFundedPeriod]
     capped: bool
     funded: bool = True
+    annual_irr: float
 
 
 class Period(BaseModel):
@@ -232,6 +233,9 @@ class FundedPeriod(Period):
 class PredictedFundedPeriod(FundedPeriod):
     predicted: bool = True
 
+
+class CashflowRequest(BaseModel):
+    churn: float
 
 class CashflowResponse(BaseModel):
     cohorts: List[FundedCohort | Cohort]
