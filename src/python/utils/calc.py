@@ -6,10 +6,15 @@ Based on the Jupyter notebook exercises
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional
+from dateutil.relativedelta import relativedelta
 from collections import defaultdict
 from src.python.db.schemas import Trade, Payment, Spend, Threshold
-from src.python.models.models import Cohort, FundedCohort, Period, FundedPeriod, CashflowResponse
+from src.python.models.models import Cohort, FundedCohort, Period, FundedPeriod, PredictedFundedPeriod
 from dataclasses import dataclass, field
+import numpy_financial as npf
+from decimal import Decimal
+
+PREDICTION_LENGTH_MONTHS = 36
 
 
 def _aggregate_payments_by_month(payments: List[Payment]) -> Dict:
@@ -19,9 +24,24 @@ def _aggregate_payments_by_month(payments: List[Payment]) -> Dict:
         payments_by_month[month_key].append(p)
     return payments_by_month
 
+def _calculate_funded_cohort_irr(spend: float, periods: List[FundedPeriod]) -> Optional[float]:                                                        
+    """Calculate IRR for a funded cohort using collected amounts"""                                                                                   
+    # Start with negative spend (initial investment)
+    cash_flows = [-spend]
+    # Use collected amount (what CVF actually received) for each period
+    cash_flows += [p.collected for p in periods]
+    monthly_irr = npf.irr(cash_flows)
+    annual_irr = (1 + monthly_irr) ** 12 - 1
+    return annual_irr
+
+def _is_predicted_period(period_num: int, payments_by_month: Dict, churn: Optional[float]) -> bool:
+    return False if churn is None else period_num >= len(payments_by_month)
+
+def _compute_prediction_for_period(periods : List[FundedPeriod | PredictedFundedPeriod], churn : float) -> Decimal:
+    return Decimal(periods[-1].payment * (1-churn))
 
 def compute_company_cohort_cashflows(
-    company_id: str, trades: List[Trade], payments: List[Payment], spends: List[Spend], thresholds: List[Threshold]
+    company_id: str, trades: List[Trade], payments: List[Payment], spends: List[Spend], thresholds: List[Threshold], churn: Optional[float] = None
 ) -> List[FundedCohort | Cohort]:
     
     @dataclass
@@ -47,12 +67,22 @@ def compute_company_cohort_cashflows(
         capped = False
 
         periods = []
+        num_periods_base = len(payments_by_month)
+        num_periods = max(num_periods_base, PREDICTION_LENGTH_MONTHS) if churn is not None and ch.trade else num_periods_base
+        latest_period_month = None
 
-        for period_num in range(len(payments_by_month.keys())):
-            payment_period_month = list(payments_by_month.keys())[period_num]
-            payments = payments_by_month[payment_period_month]
+        for period_num in range(num_periods):
 
-            payment_sum = sum([p.amount for p in payments])
+            payment_sum: Optional[float] = None
+            if not _is_predicted_period(period_num, payments_by_month, churn):
+                payment_period_month = list(payments_by_month.keys())[period_num]
+                payments = payments_by_month[payment_period_month]
+                payment_sum = sum([p.amount for p in payments])
+            else:
+                payment_period_month = latest_period_month + relativedelta(months = 1)
+                payment_sum = _compute_prediction_for_period(periods, churn)
+            
+            latest_period_month = payment_period_month
             cumulative_payment += payment_sum
 
             if ch.trade:
@@ -68,8 +98,9 @@ def compute_company_cohort_cashflows(
                 period_capped = collected == ch.trade.cash_cap
                 capped = True if period_capped else capped
 
+                period_type = PredictedFundedPeriod if _is_predicted_period(period_num, payments_by_month, churn) else FundedPeriod
                 periods.append(
-                    FundedPeriod(
+                    period_type(
                         period=period_num,
                         month=payment_period_month,
                         payment=payment_sum,
@@ -95,6 +126,7 @@ def compute_company_cohort_cashflows(
                 )
 
         if ch.trade:
+            annual_irr = _calculate_funded_cohort_irr(ch.spend.spend, periods)
             cohorts.append(
                 FundedCohort(
                     cohort_month=cohort_month,
@@ -108,6 +140,7 @@ def compute_company_cohort_cashflows(
                     cash_cap=ch.trade.cash_cap,
                     cumulative_collected=cumulative_collected,
                     capped=capped,
+                    annual_irr=annual_irr
                 )
             )
         else:
@@ -121,75 +154,9 @@ def compute_company_cohort_cashflows(
                     cumulative_payment=cumulative_payment,
                 )
             )
-    cohorts.sort(key= lambda x: x.cohort_month)
+
+    cohorts.sort(key=lambda x: x.cohort_month)
     return cohorts
-
-
-def cohorts_to_cvf_cashflows_df(cashflows: CashflowResponse) -> pd.DataFrame:
-    """
-    Convert the output of compute_company_cohort_cashflows to CVF cashflows DataFrame format
-    matching the structure from the take_home.ipynb notebook.
-    
-    Args:
-        cohorts: List of Cohort and FundedCohort objects
-        
-    Returns:
-        DataFrame with cohort dates as index, monthly periods as columns, and CVF collections as values
-    """
-    # TODO, fix this now that the input is
-    if not cohorts:
-        return pd.DataFrame()
-    
-    # Convert cohort months to timestamps and find date range
-    cohort_dates = []
-    max_periods = 0
-    
-    for cohort in cohorts:
-        # Parse cohort_month string to timestamp
-        if isinstance(cohort.cohort_month, str):
-            cohort_date = pd.to_datetime(cohort.cohort_month)
-        else:
-            cohort_date = pd.to_datetime(cohort.cohort_month)
-        cohort_dates.append(cohort_date)
-        
-        # Find the maximum number of periods across all cohorts
-        if len(cohort.periods) > max_periods:
-            max_periods = len(cohort.periods)
-    
-    if not cohort_dates:
-        return pd.DataFrame()
-        
-    # Create date range for columns (monthly periods)
-    start_date = min(cohort_dates)
-    # Create enough columns to accommodate all periods from all cohorts
-    total_months = max_periods + 12  # Extra buffer for proper display
-    date_columns = pd.date_range(start=start_date, periods=total_months, freq='MS')
-    
-    # Initialize DataFrame with cohort dates as index and monthly periods as columns
-    cvf_df = pd.DataFrame(0.0, index=sorted(cohort_dates), columns=date_columns)
-    
-    # Populate the DataFrame with CVF collection data
-    for cohort in cohorts:
-        # Parse cohort date
-        if isinstance(cohort.cohort_month, str):
-            cohort_date = pd.to_datetime(cohort.cohort_month)
-        else:
-            cohort_date = pd.to_datetime(cohort.cohort_month)
-            
-        # Only process funded cohorts (those with trades) for CVF collections
-        if isinstance(cohort, FundedCohort):
-            for period in cohort.periods:
-                # Calculate the actual month for this period
-                period_month = cohort_date + pd.DateOffset(months=period.period)
-                
-                # Ensure the period_month exists in our columns
-                if period_month in cvf_df.columns:
-                    # Use the collected amount for CVF cashflows
-                    cvf_df.loc[cohort_date, period_month] = period.collected
-        # For unfunded cohorts, we don't collect anything (leave as 0)
-    
-    return cvf_df
-
 
 # Helper functions for improved calculation
 def calculate_ltv_cac_metrics(

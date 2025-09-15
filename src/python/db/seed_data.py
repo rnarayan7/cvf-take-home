@@ -814,7 +814,7 @@ SEED_DATA_BY_COHORT_MONTH = {
         "threshold": [
             {"payment_period_month": 2, "minimum_payment_percent": 0.22},
             {"payment_period_month": 6, "minimum_payment_percent": 0.48},
-            {"payment_period_month": 12, "minimum_payment_percent": 0.70},
+            {"payment_period_month": 12, "minimum_payment_percent": 0.12},
         ],
         "monthly_data": {
             date(2023, 10, 1): {"spend": {"amount": 125000}, "trade": None, "payments": []},

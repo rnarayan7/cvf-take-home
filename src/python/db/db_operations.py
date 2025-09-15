@@ -378,42 +378,22 @@ class SpendOperations:
         logger.info("Spend deleted", spend_id=spend_id)
         return True
 
-    def list_spends(
-        self,
-        company_id: Optional[int] = None,
-        cohort_month: Optional[date] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> List[Spend]:
+    def list_spends(self,company_id: Optional[int] = None) -> List[Spend]:
         """List spends with optional filtering and pagination"""
-        logger.debug("Listing spends", company_id=company_id, cohort_month=cohort_month, limit=limit, offset=offset)
+        logger.debug("Listing spends", company_id=company_id)
 
         query = self.db.query(Spend)
 
         if company_id is not None:
             query = query.filter(Spend.company_id == company_id)
-        if cohort_month is not None:
-            query = query.filter(Spend.cohort_month == cohort_month)
 
         query = query.order_by(Spend.cohort_month.desc(), Spend.id.desc())
-
-        if offset is not None:
-            query = query.offset(offset)
-        if limit is not None:
-            query = query.limit(limit)
-
         return query.all()
 
-    def list_spends_by_company(
-        self,
-        company_id: int,
-        cohort_month: Optional[date] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> List[Spend]:
+    def list_spends_by_company(self,company_id: int) -> List[Spend]:
         """List all spends for a company with optional filtering"""
-        logger.debug("Listing spends by company", company_id=company_id, cohort_month=cohort_month)
-        return self.list_spends(company_id=company_id, cohort_month=cohort_month, limit=limit, offset=offset)
+        logger.debug("Listing spends by company", company_id=company_id)
+        return self.list_spends(company_id=company_id)
 
     def get_spend_by_company_and_cohort(self, company_id: int, cohort_month: date) -> Optional[Spend]:
         """Get specific spend by company and cohort month"""
