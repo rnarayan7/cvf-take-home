@@ -158,31 +158,3 @@ def compute_company_cohort_cashflows(
 
     cohorts.sort(key=lambda x: x.cohort_month)
     return cohorts
-
-# Helper functions for improved calculation
-def calculate_ltv_cac_metrics(
-    cohort_df: pd.DataFrame, spend_df: pd.DataFrame, horizon_months: int = 24
-) -> Dict[str, float]:
-    """Calculate LTV, CAC, and MOIC metrics"""
-
-    # Calculate total customer acquisition cost
-    total_spend = spend_df["spend"].sum() if "spend" in spend_df.columns else 0.0
-
-    # Calculate total lifetime value (sum of all payments)
-    total_payments = cohort_df.sum().sum()
-
-    # Calculate number of cohorts/campaigns
-    num_cohorts = len(cohort_df)
-
-    # Basic metrics
-    ltv_estimate = total_payments / num_cohorts if num_cohorts > 0 else 0.0
-    cac_estimate = total_spend / num_cohorts if num_cohorts > 0 else 0.0
-    moic = total_payments / total_spend if total_spend > 0 else 0.0
-
-    return {
-        "ltv_estimate": ltv_estimate,
-        "cac_estimate": cac_estimate,
-        "moic_to_date": moic,
-        "total_payments": total_payments,
-        "total_spend": total_spend,
-    }
