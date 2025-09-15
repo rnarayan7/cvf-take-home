@@ -17,8 +17,6 @@
 - **Choice Rationale**: FastAPI was selected for its:
   - Automatic OpenAPI/Swagger documentation generation
   - Built-in request/response validation with Pydantic
-  - High performance (similar to Node.js and Go)
-  - Native async/await support
   - Type hints integration for better developer experience
 
 #### **Database: SQLAlchemy + Alembic**
@@ -26,28 +24,27 @@
 - **Migrations**: Alembic for schema versioning and migrations
 - **Storage**: SQLite for development, PostgreSQL-ready for production
 - **Choice Rationale**:
-  - SQLAlchemy provides robust ORM with relationship management
-  - Alembic ensures database schema versioning
-  - PostgreSQL compatibility for production scalability
+  - Simplicity and locally defined database file
 
 #### **Data Processing: Pandas + NumPy**
 - **Pandas**: For cohort analysis and cashflow calculations
 - **NumPy**: For numerical computations
 - **NumPy-Financial**: For IRR (Internal Rate of Return) calculations
 - **Choice Rationale**: 
-  - Pandas excels at time-series and cohort analysis
-  - NumPy provides efficient numerical computations
-  - Established ecosystem for financial calculations
+  - Pandas is good at time-series and cohort analysis
+  - Still chose to primarily define my own data models using Pydantic rather than computing everything in Pandas. The reason for this is that conditional calculations like when to apply cash caps and when to apply thresholds is made much more complicated by Pandas. Given that Python runs fairly fast and we aren't yet dealing with massive scale of data that minor optimizations make a substantial difference, we should go with the simplest approach.
 
 #### **Validation & Serialization: Pydantic**
 - **Models**: Type-safe request/response schemas
 - **Validation**: Automatic input validation
 - **Serialization**: JSON serialization with type conversion
-- **Choice Rationale**: Tight integration with FastAPI, compile-time type checking
+- **Choice Rationale**:
+  - Tight integration with FastAPI, compile-time type checking
+  - Admittedly, Pydantic has done a wonderful job building out an intuitive data modeling class. Having used dataclasses, protobufs, and other ways of setting up underlying data models, this one was quite seamless.
 
 #### **Logging: Structlog**
-- **Structured Logging**: JSON-formatted logs for better observability
-- **Context Preservation**: Request tracing and debugging capabilities
+- **Structured Logging**: JSON-formatted logs for better observability. Allows segmentation of logs by file or purpose.
+- **Context Preservation**: Request tracing and debugging capabilities. Can easily add custom fields to the logger to make sure it provides a high level of information possible.
 
 #### **Testing: Pytest**
 - **Framework**: Pytest for unit and integration testing
@@ -57,13 +54,18 @@
 ### Development Tools
 
 #### **Code Quality**
-- **Ruff**: Fast Python linter and formatter
+- **Ruff**: Fast Python linter and formatter. Very lightweight and clean.
 - **Type Hints**: Full type annotation coverage
 - **Pre-commit**: Code quality enforcement
 
 #### **Model Context Protocol (MCP)**
 - **FastMCP**: Integration for AI assistant tool access
 - **Purpose**: Enables AI assistants to interact with the API programmatically
+- **Choice Rationale**:
+  - I was interested in trying to make this work but ran out of time.
+  - FastMCP has a package that allows you to bolt on an MCP server to an existing FastAPI server.
+  - I got stuck with trying to get streaming to work properly with my chatbot approach and hooking this up to a LLM.
+  - This is something that could be super interesting down the line, if you're able to wall off the data that a user has access to based on their permissioning.
 
 ---
 
@@ -103,6 +105,7 @@ GET    /companies/{id}          # Get company details
 ```
 
 ##### **Financial Data Management**
+
 ```http
 # Trades (Investment Terms)
 POST   /companies/{id}/trades/           # Create trade terms
@@ -132,33 +135,9 @@ POST   /companies/{id}/cashflows/predicted  # Predicted cashflows with churn
 GET    /companies/{id}/cohorts_table     # Cohort analysis matrix
 ```
 
-#### **Request/Response Design**
-
-##### **Consistent Response Structure**
-- All responses use Pydantic models for type safety
-- Standardized error responses with HTTP status codes
-- Date formatting: ISO 8601 strings
-- Monetary values: Decimal precision
-
-##### **Input Validation**
-- Automatic validation via Pydantic schemas
-- Business rule validation (e.g., positive amounts, valid date ranges)
-- Custom validation for financial constraints
-
-##### **Error Handling**
-```python
-# Standard error responses
-404: Resource not found
-400: Invalid input data
-500: Internal server error
-409: Conflict (e.g., duplicate resources)
-```
-
 #### **CSV Upload Support**
-- Bulk payment upload via `/companies/{id}/payments/upload`
-- Automatic parsing and validation
-- Error reporting for invalid rows
-- Transaction-safe bulk inserts
+- Bulk payment upload via `/companies/{id}/payments/upload` # this wasn't implemented yet but should be implemented
+- Note that I did not yet implement this, but this would simply be able to ingest a monthly payment CSV and ingest it into the system. Handling data cleaning and validation is a gnarly problem in its own right, and we would need a way of notifying ourselves and users if we encounter an issue here.
 
 ---
 
@@ -175,6 +154,8 @@ Companies (1) -> (N) Spends
 Companies (1) -> (N) Thresholds
 Spends (1) -> (N) Customers
 ```
+- Customers is not necessary in this design given what we're showing in the UI at the moment
+- We can add a dashboard for top performing customers which would make this really valuable for our portcos. But, at that point, we might be slightly overstepping into other tools that they have that give them context on sales and GTM.
 
 ### Core Tables
 
@@ -414,6 +395,8 @@ def _compute_prediction_for_period(periods: List[FundedPeriod | PredictedFundedP
 
 This creates a geometric decay series that models customer attrition over time.
 
+This method of calculating churn is very simplistic, we might want to look at a better way of calculating the correct m0 and churn values. Right now, we just look at the last value to determine m0, we could use the average or the 75% median, so we're not thrown off by an abnormally high last payment. For churn, we can do this by doing the some of monthly churns / number of months.
+
 #### **Revenue Sharing Algorithm**
 
 For funded cohorts (those with trades), the system implements complex revenue sharing rules:
@@ -434,7 +417,7 @@ collected = min(share_applied * payment_sum, ch.trade.cash_cap - cumulative_coll
 ```
 
 **Algorithm Components**:
-1. **Threshold Override**: 100% collection (share_applied = 1) when performance is below threshold
+1. **Threshold Override**: 100% collection (share_applied = 1) when performance is below threshold. This is another area where we can make it modifiable by enabling overrides by the admin team. Right now, we default to collecting 100%, but we can also choose to set our collection percentage to be a lower amount.
 2. **Normal Sharing**: Apply the negotiated sharing percentage for meeting targets
 3. **Cash Cap Enforcement**: Respect the maximum collection limit across all periods
 
@@ -647,6 +630,8 @@ class CashflowRequest(BaseModel):
   - Database indexing optimization
   - Query performance monitoring
   - Connection pooling implementation
+  - Improved security
+  - Sharding when data gets really large
 
 #### **Caching Strategy**
 - **Problem**: Expensive cohort calculations on every request
@@ -654,38 +639,31 @@ class CashflowRequest(BaseModel):
   - Redis caching for calculated cashflows
   - Background job processing for large calculations
   - Incremental calculation updates
+  - Simplest idea is to have a cache for all API endpoints, and as soon as a mutating operation (update spends or update payments) happens, we invalidate the cohort's key in the cache. Then, we can kick off an async operation to recompute cashflows, which will be dumped into the cache.
 
 #### **API Performance**
 - **Current Limitations**: Synchronous processing
 - **Improvements**:
-  - Async database operations
-  - Bulk operation endpoints
-  - Pagination for large datasets
-  - Response compression
+  - Pagination for large datasets. We have a very small set of data that we're currently processing that is primarily seeded by a seed_data.py script. As more and more data becomes available, we will need to modify our API to properly handle response sizes that are far larger than what we currently support.
 
 ### 2. **Advanced Analytics & ML**
 
 #### **Predictive Modeling**
 - **Current**: Simple churn-based projections
 - **Enhancement Opportunities**:
-  - Machine learning models for churn prediction
-  - Cohort behavior clustering
-  - Seasonal adjustment algorithms
-  - External data integration (economic indicators)
+  - Machine learning models for churn prediction. Our way of calculating churn and m0 at the moment is very basic. This is an area where we can invest a lot into to run regressions etc to better predict cohort performance.
+  - Temporary adjustment algorithms. Right now, churn is modifiable by the CVF admin, but we can make this something where we can guide the CVF admin based on historical performance as to what would be appropriate churn values based on outputs.
 
 #### **Real-time Analytics**
 - **Investment Areas**:
-  - Streaming data processing
-  - Real-time dashboards
-  - Alert systems for threshold breaches
-  - Automated reporting
+  - Alert systems for threshold breaches. Another potential area of investment here is calculating whether we will project to pass a threshold midway through the month. We probably have enough historical data to build some simple mathematical model that can help us predict the outcome over a range of 3-4 days as opposed to a whole month.
+  - Automated reporting to us as CVF admins and the portfolio companies.
 
 #### **Advanced Financial Metrics**
 - **Additional Calculations**:
-  - Risk-adjusted returns
-  - Portfolio diversification metrics
-  - Stress testing scenarios
-  - Monte Carlo simulations
+  - Better IRR calculations for us as investors. How are cohorts are stacking up against past cohorts. Projected IRRs based on historical performance.
+  - Whether certain customers churn at a higher rate for portfolio companies.
+  - Could do some really interesting simulations with random sampling of data to see how cohorts perform.
 
 ### 3. **Data Integration & ETL**
 
@@ -695,88 +673,40 @@ class CashflowRequest(BaseModel):
   - Automated data ingestion from company systems
   - API integrations with payment processors
   - Data validation and cleansing pipelines
-  - Real-time sync capabilities
-
+  
 #### **Data Quality & Governance**
 - **Investment Needs**:
-  - Data validation frameworks
-  - Audit trails for data changes
-  - Data lineage tracking
-  - Compliance reporting
+  - Data validation and cleaning. This will be a huge area of focus because gettting data in to the system efficiently and correctly is probably the greatest determinant of success to the system.
 
 ### 4. **User Interface & Experience**
 
 #### **Frontend Development**
 - **Current State**: API-only (Swagger docs)
 - **Investment Opportunities**:
-  - React/Vue.js dashboard
-  - Interactive data visualizations
-  - Mobile-responsive design
-  - User authentication & authorization
-
-#### **Reporting & Visualization**
-- **Enhanced Features**:
-  - Automated report generation
-  - Custom dashboard creation
-  - Export capabilities (PDF, Excel)
-  - Embedding analytics in external systems
+  - Cooler dashboards, better metrics, aggregated bar graphs.
 
 ### 5. **Security & Compliance**
 
 #### **Authentication & Authorization**
 - **Current Gap**: No authentication system
-- **Implementation Needs**:
-  - JWT-based authentication
-  - Role-based access control (RBAC)
-  - API key management
-  - OAuth2 integration
 
 #### **Data Security**
 - **Investment Areas**:
-  - Data encryption at rest and in transit
-  - Audit logging for sensitive operations
-  - GDPR compliance features
-  - Data anonymization capabilities
+  - Ecyrption
+  - Audit logging
+---
+## Developer tooling
 
-#### **Financial Compliance**
-- **Considerations**:
-  - SOX compliance for financial data
-  - Audit trail requirements
-  - Data retention policies
-  - Regulatory reporting features
+### Claude code
+I used a multi-agent setup with Claude Code that dramatically sped up my iteration speed.
+It consisted of the following agents:
+- Database migration agent (handled all DB changes)
+- API endpoint manager (all API changes)
+- Code reviewer (periodically assessed for type correctness)
+- Documentation writer (wrote all markdown files)
 
-### 6. **DevOps & Infrastructure**
-
-#### **Deployment & Monitoring**
-- **Current State**: Local development environment
-- **Production Readiness**:
-  - Container orchestration (Docker/Kubernetes)
-  - CI/CD pipelines
-  - Infrastructure as Code (Terraform)
-  - Comprehensive monitoring (Prometheus/Grafana)
-
-#### **Backup & Disaster Recovery**
-- **Investment Needs**:
-  - Automated backup strategies
-  - Point-in-time recovery
-  - Multi-region deployment
-  - Disaster recovery testing
-
-### 7. **Integration & Ecosystem**
-
-#### **Third-party Integrations**
-- **Potential Integrations**:
-  - Accounting systems (QuickBooks, Xero)
-  - CRM platforms (Salesforce, HubSpot)
-  - Payment processors (Stripe, PayPal)
-  - Business intelligence tools (Tableau, Looker)
-
-#### **API Ecosystem**
-- **Expansion Opportunities**:
-  - Public API documentation
-  - SDK development (Python, JavaScript)
-  - Webhook support for real-time notifications
-  - GraphQL endpoint for flexible queries
+### Lovable
+I used Lovable extensively to mock up the UI initially. I found it had certain strengths and weaknesses compared to Claude Code, which I'm happy to discuss my views on further.
 
 ---
 
