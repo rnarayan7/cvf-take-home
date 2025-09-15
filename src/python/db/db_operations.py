@@ -267,6 +267,36 @@ class ThresholdOperations:
         logger.info("Threshold created", threshold_id=threshold.id)
         return threshold
 
+    def get_threshold_by_id(self, threshold_id: int) -> Optional[Threshold]:
+        """Get threshold by ID"""
+        logger.debug("Fetching threshold", threshold_id=threshold_id)
+        return self.db.query(Threshold).filter(Threshold.id == threshold_id).first()
+
+    def update_threshold(
+        self,
+        threshold_id: int,
+        payment_period_month: Optional[int] = None,
+        minimum_payment_percent: Optional[float] = None,
+    ) -> Optional[Threshold]:
+        """Update an existing threshold record"""
+        logger.info("Updating threshold", threshold_id=threshold_id)
+
+        threshold = self.get_threshold_by_id(threshold_id)
+        if not threshold:
+            logger.warning("Threshold not found for update", threshold_id=threshold_id)
+            return None
+
+        if payment_period_month is not None:
+            threshold.payment_period_month = payment_period_month
+        if minimum_payment_percent is not None:
+            threshold.minimum_payment_percent = minimum_payment_percent
+
+        self.db.commit()
+        self.db.refresh(threshold)
+
+        logger.info("Threshold updated", threshold_id=threshold_id)
+        return threshold
+
     def list_thresholds_by_company(self, company_id: int) -> List[Threshold]:
         """List all thresholds for a company"""
         logger.debug("Listing thresholds", company_id=company_id)

@@ -335,6 +335,68 @@ async def list_thresholds(company_id: int, db_ops: DatabaseOperations = Depends(
     return [models.ThresholdResponse.from_db(threshold) for threshold in db_thresholds]
 
 
+@app.put("/companies/{company_id}/thresholds/{threshold_id}", response_model=models.ThresholdResponse, tags=["Thresholds"])
+async def update_threshold(
+    company_id: int,
+    threshold_id: int,
+    threshold_update: models.ThresholdUpdate,
+    db_ops: DatabaseOperations = Depends(get_db_operations),
+):
+    """Update an existing threshold for a specific company"""
+    logger.info("Updating threshold", company_id=company_id, threshold_id=threshold_id)
+
+    try:
+        # Validate company exists
+        if not db_ops.companies.company_exists(company_id):
+            logger.warning("Company not found for threshold update", company_id=company_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Check if threshold exists and belongs to the company
+        existing_threshold = db_ops.thresholds.get_threshold_by_id(threshold_id)
+        if not existing_threshold:
+            logger.warning("Threshold not found for update", company_id=company_id, threshold_id=threshold_id)
+            raise HTTPException(status_code=404, detail="Threshold not found")
+
+        if existing_threshold.company_id != company_id:
+            logger.warning(
+                "Threshold does not belong to company",
+                company_id=company_id,
+                threshold_id=threshold_id,
+                threshold_company_id=existing_threshold.company_id,
+            )
+            raise HTTPException(status_code=404, detail="Threshold not found")
+
+        # Validate minimum_payment_percent if being updated
+        if threshold_update.minimum_payment_percent is not None:
+            if threshold_update.minimum_payment_percent < 0 or threshold_update.minimum_payment_percent > 1:
+                logger.warning("Invalid minimum payment percent", percent=threshold_update.minimum_payment_percent)
+                raise HTTPException(status_code=400, detail="Minimum payment percent must be between 0 and 1")
+
+        # Validate payment_period_month if being updated
+        if threshold_update.payment_period_month is not None and threshold_update.payment_period_month < 0:
+            logger.warning("Invalid payment period month", month=threshold_update.payment_period_month)
+            raise HTTPException(status_code=400, detail="Payment period month must be non-negative")
+
+        # Update threshold
+        updated_threshold = db_ops.thresholds.update_threshold(
+            threshold_id=threshold_id,
+            payment_period_month=threshold_update.payment_period_month,
+            minimum_payment_percent=threshold_update.minimum_payment_percent,
+        )
+
+        if not updated_threshold:
+            logger.error("Failed to update threshold", company_id=company_id, threshold_id=threshold_id)
+            raise HTTPException(status_code=500, detail="Failed to update threshold")
+
+        return models.ThresholdResponse.from_db(updated_threshold)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update threshold", company_id=company_id, threshold_id=threshold_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to update threshold")
+
+
 @app.get("/companies/{company_id}/spends/", response_model=List[models.SpendResponse], tags=["Spends"])
 async def list_company_spends(
     company_id: int,
