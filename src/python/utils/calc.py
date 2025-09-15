@@ -59,6 +59,9 @@ def compute_company_cohort_cashflows(
                 payment_percentage = payment_sum / ch.spend.spend
                 threshold = thresholds_by_period_num.get(period_num, None)
                 threshold_failed = threshold is not None and payment_percentage < threshold.minimum_payment_percent
+                threshold_payment_share = threshold.minimum_payment_percent if threshold is not None else None
+                threshold_payment_percentage = threshold_payment_share*100 if threshold_payment_share is not None else None
+                threshold_expected_payment = threshold_payment_share * ch.spend.spend if threshold_payment_share else None
                 share_applied = 1 if threshold_failed else ch.trade.sharing_percentage
                 collected = min(share_applied * payment_sum, ch.trade.cash_cap - cumulative_collected)
                 cumulative_collected += collected
@@ -71,7 +74,8 @@ def compute_company_cohort_cashflows(
                         month=payment_period_month,
                         payment=payment_sum,
                         cumulative_payment=cumulative_payment,
-                        threshold_payment_percentage=threshold.minimum_payment_percent if threshold else None,
+                        threshold_payment_percentage=threshold_payment_percentage,
+                        threshold_expected_payment=threshold_expected_payment,
                         threshold_failed=threshold_failed,
                         share_applied=share_applied,
                         collected=collected,
@@ -117,6 +121,7 @@ def compute_company_cohort_cashflows(
                     cumulative_payment=cumulative_payment,
                 )
             )
+    cohorts.sort(key= lambda x: x.cohort_month)
     return cohorts
 
 

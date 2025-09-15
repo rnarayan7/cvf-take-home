@@ -1,5 +1,5 @@
 from __future__ import annotations
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date, datetime
 import src.python.db.schemas as db_schemas
@@ -114,6 +114,11 @@ class ThresholdCreate(ThresholdBase):
     pass
 
 
+class ThresholdUpdate(BaseModel):
+    payment_period_month: Optional[int] = None
+    minimum_payment_percent: Optional[float] = None
+
+
 class ThresholdResponse(ThresholdBase):
     id: int
     company_id: int
@@ -215,7 +220,8 @@ class Period(BaseModel):
 
 
 class FundedPeriod(Period):
-    theshold_payment_percentage: Optional[float] = None
+    threshold_payment_percentage: Optional[float] = None
+    threshold_expected_payment: Optional[float] = None
     threshold_failed: bool
     share_applied: float
     collected: float

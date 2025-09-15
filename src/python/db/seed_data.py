@@ -28,7 +28,7 @@ SEED_DATA_BY_COHORT_MONTH = {
             {"payment_period_month": 0, "minimum_payment_percent": 0.15},
             {"payment_period_month": 1, "minimum_payment_percent": 0.10},
             {"payment_period_month": 3, "minimum_payment_percent": 0.25},
-            {"payment_period_month": 6, "minimum_payment_percent": 0.45},
+            {"payment_period_month": 6, "minimum_payment_percent": 0.1},
         ],
         "monthly_data": {
             date(2023, 10, 1): {
@@ -132,10 +132,9 @@ SEED_DATA_BY_COHORT_MONTH = {
         "threshold": [
             {"payment_period_month": 0, "minimum_payment_percent": 0.20},
             {"payment_period_month": 2, "minimum_payment_percent": 0.30},
-            {"payment_period_month": 4, "minimum_payment_percent": 0.50},
+            {"payment_period_month": 4, "minimum_payment_percent": 0.05},
         ],
         "monthly_data": {
-            date(2023, 10, 1): {"spend": {"amount": 89000}, "trade": None, "payments": []},
             date(2023, 11, 1): {
                 "spend": {"amount": 82000},
                 "trade": {"sharing_percentage": 0.40, "cash_cap": 115000.0},
@@ -203,19 +202,36 @@ SEED_DATA_BY_COHORT_MONTH = {
                     {"customer_id": "tech_010", "payment_date": date(2024, 4, 20), "amount": 4100},
                 ],
             },
-            date(2024, 5, 1): {"spend": {"amount": 85000}, "trade": None, "payments": []},
+            date(2024, 5, 1): {"spend": {"amount": 85000}, "trade": None, "payments": [
+                    {"customer_id": "tech_011", "payment_date": date(2024, 5, 10), "amount": 3200},
+                    {"customer_id": "tech_012", "payment_date": date(2024, 6, 10), "amount": 3100},
+                    {"customer_id": "tech_012", "payment_date": date(2024, 7, 20), "amount": 4100},
+                ]},
         },
     },
     "GrowthCo": {
         "threshold": [
             {"payment_period_month": 1, "minimum_payment_percent": 0.12},
-            {"payment_period_month": 3, "minimum_payment_percent": 0.28},
-            {"payment_period_month": 6, "minimum_payment_percent": 0.55},
-            {"payment_period_month": 12, "minimum_payment_percent": 0.75},
+            {"payment_period_month": 3, "minimum_payment_percent": 0.17},
+            {"payment_period_month": 6, "minimum_payment_percent": 0.2},
+            {"payment_period_month": 12, "minimum_payment_percent": 0.3},
         ],
         "monthly_data": {
-            date(2023, 10, 1): {"spend": {"amount": 335000}, "trade": None, "payments": []},
-            date(2023, 11, 1): {"spend": {"amount": 315000}, "trade": None, "payments": []},
+            date(2023, 10, 1): {"spend": {"amount": 335000}, "trade": None, "payments": [
+                    {"customer_id": "growth_101", "payment_date": date(2024, 1, 8), "amount": 12000},
+                    {"customer_id": "growth_101", "payment_date": date(2024, 2, 8), "amount": 11800},
+                    {"customer_id": "growth_101", "payment_date": date(2024, 3, 8), "amount": 12300},
+                    {"customer_id": "growth_102", "payment_date": date(2024, 1, 15), "amount": 18500},
+                    {"customer_id": "growth_102", "payment_date": date(2024, 2, 15), "amount": 18200},
+                    {"customer_id": "growth_102", "payment_date": date(2024, 3, 15), "amount": 18800},
+                ]},
+            date(2023, 11, 1): {"spend": {"amount": 315000}, "trade": None, "payments": [
+                    {"customer_id": "growth_103", "payment_date": date(2024, 2, 5), "amount": 16500},
+                    {"customer_id": "growth_103", "payment_date": date(2024, 3, 5), "amount": 16200},
+                    {"customer_id": "growth_103", "payment_date": date(2024, 4, 5), "amount": 16800},
+                    {"customer_id": "growth_104", "payment_date": date(2024, 2, 20), "amount": 24000},
+                    {"customer_id": "growth_104", "payment_date": date(2024, 3, 20), "amount": 23500},
+                ]},
             date(2023, 12, 1): {
                 "spend": {"amount": 298000},
                 "trade": {"sharing_percentage": 0.28, "cash_cap": 370000.0},
@@ -278,19 +294,46 @@ SEED_DATA_BY_COHORT_MONTH = {
                     {"customer_id": "growth_011", "payment_date": date(2024, 4, 22), "amount": 30000},
                 ],
             },
-            date(2024, 5, 1): {"spend": {"amount": 320000}, "trade": None, "payments": []},
+            date(2024, 5, 1): {"spend": {"amount": 320000}, "trade": None, "payments": [
+                    {"customer_id": "growth_012", "payment_date": date(2024, 5, 10), "amount": 28000},
+                    {"customer_id": "growth_012", "payment_date": date(2024, 6, 10), "amount": 27500},
+                    {"customer_id": "growth_013", "payment_date": date(2024, 5, 25), "amount": 21000},
+                    {"customer_id": "growth_013", "payment_date": date(2024, 6, 25), "amount": 20800},
+                    {"customer_id": "growth_014", "payment_date": date(2024, 5, 18), "amount": 35000},
+                ]},
         },
     },
     "DataDriven Solutions": {
         "threshold": [
             {"payment_period_month": 0, "minimum_payment_percent": 0.18},
             {"payment_period_month": 2, "minimum_payment_percent": 0.35},
-            {"payment_period_month": 6, "minimum_payment_percent": 0.60},
+            {"payment_period_month": 6, "minimum_payment_percent": 0.10},
         ],
         "monthly_data": {
-            date(2023, 10, 1): {"spend": {"amount": 168000}, "trade": None, "payments": []},
-            date(2023, 11, 1): {"spend": {"amount": 125000}, "trade": None, "payments": []},
-            date(2023, 12, 1): {"spend": {"amount": 144000}, "trade": None, "payments": []},
+            date(2023, 10, 1): {"spend": {"amount": 168000}, "trade": None, 
+                "payments": [
+                    {"customer_id": "data_011", "payment_date": date(2024, 1, 12), "amount": 4500},
+                    {"customer_id": "data_011", "payment_date": date(2024, 2, 12), "amount": 4300},
+                    {"customer_id": "data_012", "payment_date": date(2024, 1, 20), "amount": 6200},
+                    {"customer_id": "data_012", "payment_date": date(2024, 2, 20), "amount": 6000},
+                    {"customer_id": "data_012", "payment_date": date(2024, 3, 20), "amount": 6400},
+                ]
+            },
+            date(2023, 11, 1): {"spend": {"amount": 125000}, "trade": None, 
+                                "payments": [
+                    {"customer_id": "data_021", "payment_date": date(2024, 1, 12), "amount": 500},
+                    {"customer_id": "data_021", "payment_date": date(2024, 2, 12), "amount": 300},
+                    {"customer_id": "data_022", "payment_date": date(2024, 1, 20), "amount": 200},
+                    {"customer_id": "data_022", "payment_date": date(2024, 2, 20), "amount": 100},
+                    {"customer_id": "data_022", "payment_date": date(2024, 3, 20), "amount": 2400},
+                ]},
+            date(2023, 12, 1): {"spend": {"amount": 144000}, "trade": None, "payments": [
+                    {"customer_id": "data_031", "payment_date": date(2024, 3, 8), "amount": 3200},
+                    {"customer_id": "data_031", "payment_date": date(2024, 4, 8), "amount": 3100},
+                    {"customer_id": "data_031", "payment_date": date(2024, 5, 8), "amount": 3300},
+                    {"customer_id": "data_032", "payment_date": date(2024, 3, 15), "amount": 5800},
+                    {"customer_id": "data_032", "payment_date": date(2024, 4, 15), "amount": 5600},
+                ]},
             date(2024, 1, 1): {
                 "spend": {"amount": 162000},
                 "trade": {"sharing_percentage": 0.38, "cash_cap": 195000.0},
@@ -331,18 +374,37 @@ SEED_DATA_BY_COHORT_MONTH = {
                     {"customer_id": "data_008", "payment_date": date(2024, 4, 25), "amount": 6200},
                 ],
             },
-            date(2024, 5, 1): {"spend": {"amount": 132000}, "trade": None, "payments": []},
+            date(2024, 5, 1): {"spend": {"amount": 132000}, "trade": None, "payments": [
+                    {"customer_id": "data_009", "payment_date": date(2024, 5, 12), "amount": 4800},
+                    {"customer_id": "data_009", "payment_date": date(2024, 6, 12), "amount": 4600},
+                    {"customer_id": "data_010", "payment_date": date(2024, 5, 20), "amount": 6200},
+                    {"customer_id": "data_010", "payment_date": date(2024, 6, 20), "amount": 6000},
+                    {"customer_id": "data_010", "payment_date": date(2024, 7, 20), "amount": 6400},
+                ]},
         },
     },
     "CloudFirst Technologies": {
         "threshold": [
             {"payment_period_month": 1, "minimum_payment_percent": 0.14},
             {"payment_period_month": 3, "minimum_payment_percent": 0.32},
-            {"payment_period_month": 9, "minimum_payment_percent": 0.70},
+            {"payment_period_month": 9, "minimum_payment_percent": 0.20},
         ],
         "monthly_data": {
-            date(2023, 10, 1): {"spend": {"amount": 245000}, "trade": None, "payments": []},
-            date(2023, 11, 1): {"spend": {"amount": 218000}, "trade": None, "payments": []},
+            date(2023, 10, 1): {"spend": {"amount": 245000}, "trade": None, "payments": [
+                    {"customer_id": "cloud_011", "payment_date": date(2024, 1, 12), "amount": 8800},
+                    {"customer_id": "cloud_011", "payment_date": date(2024, 2, 12), "amount": 8500},
+                    {"customer_id": "cloud_011", "payment_date": date(2024, 3, 12), "amount": 8900},
+                    {"customer_id": "cloud_012", "payment_date": date(2024, 1, 20), "amount": 12200},
+                    {"customer_id": "cloud_012", "payment_date": date(2024, 2, 20), "amount": 11900},
+                ]},
+            date(2023, 11, 1): {"spend": {"amount": 218000}, "trade": None, "payments": [
+                    {"customer_id": "cloud_013", "payment_date": date(2024, 2, 8), "amount": 9500},
+                    {"customer_id": "cloud_013", "payment_date": date(2024, 3, 8), "amount": 9200},
+                    {"customer_id": "cloud_013", "payment_date": date(2024, 4, 8), "amount": 9800},
+                    {"customer_id": "cloud_014", "payment_date": date(2024, 2, 15), "amount": 11800},
+                    {"customer_id": "cloud_014", "payment_date": date(2024, 3, 15), "amount": 11500},
+                    {"customer_id": "cloud_014", "payment_date": date(2024, 4, 15), "amount": 12000},
+                ]},
             date(2023, 12, 1): {
                 "spend": {"amount": 195000},
                 "trade": {"sharing_percentage": 0.33, "cash_cap": 245000.0},
@@ -386,20 +448,52 @@ SEED_DATA_BY_COHORT_MONTH = {
                     {"customer_id": "cloud_009", "payment_date": date(2024, 4, 25), "amount": 14200},
                 ],
             },
-            date(2024, 4, 1): {"spend": {"amount": 225000}, "trade": None, "payments": []},
-            date(2024, 5, 1): {"spend": {"amount": 242000}, "trade": None, "payments": []},
+            date(2024, 4, 1): {"spend": {"amount": 225000}, "trade": None, "payments": [
+                    {"customer_id": "cloud_015", "payment_date": date(2024, 4, 10), "amount": 10500},
+                    {"customer_id": "cloud_015", "payment_date": date(2024, 5, 10), "amount": 10200},
+                    {"customer_id": "cloud_015", "payment_date": date(2024, 6, 10), "amount": 10800},
+                    {"customer_id": "cloud_016", "payment_date": date(2024, 4, 25), "amount": 14000},
+                    {"customer_id": "cloud_016", "payment_date": date(2024, 5, 25), "amount": 13700},
+                ]},
+            date(2024, 5, 1): {"spend": {"amount": 242000}, "trade": None, "payments": [
+                    {"customer_id": "cloud_017", "payment_date": date(2024, 5, 8), "amount": 11500},
+                    {"customer_id": "cloud_017", "payment_date": date(2024, 6, 8), "amount": 11200},
+                    {"customer_id": "cloud_017", "payment_date": date(2024, 7, 8), "amount": 11800},
+                    {"customer_id": "cloud_018", "payment_date": date(2024, 5, 18), "amount": 15200},
+                    {"customer_id": "cloud_018", "payment_date": date(2024, 6, 18), "amount": 14900},
+                    {"customer_id": "cloud_019", "payment_date": date(2024, 5, 28), "amount": 8900},
+                ]},
         },
     },
     "AI Innovations Ltd": {
         "threshold": [
             {"payment_period_month": 0, "minimum_payment_percent": 0.22},
             {"payment_period_month": 3, "minimum_payment_percent": 0.40},
-            {"payment_period_month": 6, "minimum_payment_percent": 0.65},
+            {"payment_period_month": 6, "minimum_payment_percent": 0.25},
         ],
         "monthly_data": {
-            date(2023, 10, 1): {"spend": {"amount": 185000}, "trade": None, "payments": []},
-            date(2023, 11, 1): {"spend": {"amount": 225000}, "trade": None, "payments": []},
-            date(2023, 12, 1): {"spend": {"amount": 168000}, "trade": None, "payments": []},
+            date(2023, 10, 1): {"spend": {"amount": 185000}, "trade": None, "payments": [
+                    {"customer_id": "ai_011", "payment_date": date(2024, 1, 10), "amount": 7200},
+                    {"customer_id": "ai_011", "payment_date": date(2024, 2, 10), "amount": 7000},
+                    {"customer_id": "ai_011", "payment_date": date(2024, 3, 10), "amount": 7400},
+                    {"customer_id": "ai_012", "payment_date": date(2024, 1, 18), "amount": 10500},
+                    {"customer_id": "ai_012", "payment_date": date(2024, 2, 18), "amount": 10200},
+                ]},
+            date(2023, 11, 1): {"spend": {"amount": 225000}, "trade": None, "payments": [
+                    {"customer_id": "ai_013", "payment_date": date(2024, 2, 5), "amount": 9800},
+                    {"customer_id": "ai_013", "payment_date": date(2024, 3, 5), "amount": 9500},
+                    {"customer_id": "ai_013", "payment_date": date(2024, 4, 5), "amount": 10100},
+                    {"customer_id": "ai_014", "payment_date": date(2024, 2, 12), "amount": 13500},
+                    {"customer_id": "ai_014", "payment_date": date(2024, 3, 12), "amount": 13200},
+                    {"customer_id": "ai_014", "payment_date": date(2024, 4, 12), "amount": 13800},
+                ]},
+            date(2023, 12, 1): {"spend": {"amount": 168000}, "trade": None, "payments": [
+                    {"customer_id": "ai_015", "payment_date": date(2024, 3, 8), "amount": 6800},
+                    {"customer_id": "ai_015", "payment_date": date(2024, 4, 8), "amount": 6500},
+                    {"customer_id": "ai_015", "payment_date": date(2024, 5, 8), "amount": 6900},
+                    {"customer_id": "ai_016", "payment_date": date(2024, 3, 20), "amount": 8200},
+                    {"customer_id": "ai_016", "payment_date": date(2024, 4, 20), "amount": 8000},
+                ]},
             date(2024, 1, 1): {
                 "spend": {"amount": 235000},
                 "trade": {"sharing_percentage": 0.41, "cash_cap": 290000.0},
@@ -433,15 +527,27 @@ SEED_DATA_BY_COHORT_MONTH = {
                     {"customer_id": "ai_006", "payment_date": date(2024, 4, 18), "amount": 10900},
                 ],
             },
-            date(2024, 4, 1): {"spend": {"amount": 205000}, "trade": None, "payments": []},
-            date(2024, 5, 1): {"spend": {"amount": 192000}, "trade": None, "payments": []},
+            date(2024, 4, 1): {"spend": {"amount": 205000}, "trade": None, "payments": [
+                    {"customer_id": "ai_007", "payment_date": date(2024, 4, 12), "amount": 8500},
+                    {"customer_id": "ai_007", "payment_date": date(2024, 5, 12), "amount": 8200},
+                    {"customer_id": "ai_007", "payment_date": date(2024, 6, 12), "amount": 8800},
+                    {"customer_id": "ai_008", "payment_date": date(2024, 4, 22), "amount": 11800},
+                    {"customer_id": "ai_008", "payment_date": date(2024, 5, 22), "amount": 11500},
+                ]},
+            date(2024, 5, 1): {"spend": {"amount": 192000}, "trade": None, "payments": [
+                    {"customer_id": "ai_009", "payment_date": date(2024, 5, 8), "amount": 7800},
+                    {"customer_id": "ai_009", "payment_date": date(2024, 6, 8), "amount": 7500},
+                    {"customer_id": "ai_009", "payment_date": date(2024, 7, 8), "amount": 7900},
+                    {"customer_id": "ai_010", "payment_date": date(2024, 5, 25), "amount": 10200},
+                    {"customer_id": "ai_010", "payment_date": date(2024, 6, 25), "amount": 9900},
+                ]},
         },
     },
     "ScaleUp Ventures": {
         "threshold": [
             {"payment_period_month": 1, "minimum_payment_percent": 0.16},
             {"payment_period_month": 4, "minimum_payment_percent": 0.42},
-            {"payment_period_month": 8, "minimum_payment_percent": 0.68},
+            {"payment_period_month": 8, "minimum_payment_percent": 0.12},
         ],
         "monthly_data": {
             date(2023, 10, 1): {"spend": {"amount": 125000}, "trade": None, "payments": []},
@@ -456,7 +562,13 @@ SEED_DATA_BY_COHORT_MONTH = {
                     {"customer_id": "scale_002", "payment_date": date(2023, 12, 25), "amount": 2800},
                 ],
             },
-            date(2023, 12, 1): {"spend": {"amount": 148000}, "trade": None, "payments": []},
+            date(2023, 12, 1): {"spend": {"amount": 148000}, "trade": None, "payments": [
+                    {"customer_id": "scale_013", "payment_date": date(2024, 3, 5), "amount": 4500},
+                    {"customer_id": "scale_013", "payment_date": date(2024, 4, 5), "amount": 4300},
+                    {"customer_id": "scale_013", "payment_date": date(2024, 5, 5), "amount": 4700},
+                    {"customer_id": "scale_014", "payment_date": date(2024, 3, 18), "amount": 3600},
+                    {"customer_id": "scale_014", "payment_date": date(2024, 4, 18), "amount": 3500},
+                ]},
             date(2024, 1, 1): {
                 "spend": {"amount": 108000},
                 "trade": {"sharing_percentage": 0.37, "cash_cap": 140000.0},
@@ -494,8 +606,8 @@ SEED_DATA_BY_COHORT_MONTH = {
         "threshold": [
             {"payment_period_month": 0, "minimum_payment_percent": 0.10},
             {"payment_period_month": 2, "minimum_payment_percent": 0.25},
-            {"payment_period_month": 6, "minimum_payment_percent": 0.50},
-            {"payment_period_month": 12, "minimum_payment_percent": 0.80},
+            {"payment_period_month": 6, "minimum_payment_percent": 0.25},
+            {"payment_period_month": 12, "minimum_payment_percent": 0.25},
         ],
         "monthly_data": {
             date(2023, 10, 1): {"spend": {"amount": 315000}, "trade": None, "payments": []},
